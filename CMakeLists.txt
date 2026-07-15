@@ -15,6 +15,19 @@ if(NOT raylib_FOUND)
     message(STATUS "System raylib not found — fetching raylib 5.5")
     include(FetchContent)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+    # Build GLFW with native Wayland when the dev headers are available,
+    # alongside X11 — GLFW 3.4 picks the backend at runtime. Without the
+    # headers we stay X11-only, which still runs on Wayland via XWayland.
+    set(GLFW_BUILD_X11 ON CACHE BOOL "" FORCE)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(WAYLAND_DEPS QUIET wayland-client wayland-cursor wayland-egl wayland-protocols xkbcommon)
+        if(WAYLAND_DEPS_FOUND)
+            message(STATUS "Wayland headers found — enabling native Wayland backend")
+            set(GLFW_BUILD_WAYLAND ON CACHE BOOL "" FORCE)
+        endif()
+    endif()
     FetchContent_Declare(
         raylib
         GIT_REPOSITORY https://github.com/raysan5/raylib.git
