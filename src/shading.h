@@ -16,16 +16,19 @@ inline Shader LoadShadingShader() {
         uniform mat4 mvp;
         out vec4 fragColor;
         out vec3 fragNormal;
+        out float fragDist;
         void main() {
             fragColor = vertexColor;
             fragNormal = vertexNormal;
             gl_Position = mvp * vec4(vertexPosition, 1.0);
+            fragDist = gl_Position.w; // ~view-space distance
         }
     )";
     const char* fs = R"(
         #version 330
         in vec4 fragColor;
         in vec3 fragNormal;
+        in float fragDist;
         uniform vec4 colDiffuse;
         out vec4 finalColor;
         void main() {
@@ -34,8 +37,11 @@ inline Shader LoadShadingShader() {
             vec3 fillLight = normalize(vec3(-0.5, 0.25, -0.65));
             float b = 0.55 + 0.38 * max(dot(n, keyLight), 0.0)
                            + 0.20 * max(dot(n, fillLight), 0.0);
-            finalColor = vec4(fragColor.rgb * colDiffuse.rgb * b,
-                              fragColor.a * colDiffuse.a);
+            vec3 lit = fragColor.rgb * colDiffuse.rgb * b;
+            // distance fog toward the void color, for depth
+            float fog = clamp((fragDist - 25.0) / 90.0, 0.0, 0.55);
+            vec3 fogCol = vec3(0.04, 0.015, 0.03);
+            finalColor = vec4(mix(lit, fogCol, fog), fragColor.a * colDiffuse.a);
         }
     )";
     return LoadShaderFromMemory(vs, fs);

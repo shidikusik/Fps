@@ -46,6 +46,7 @@ add_executable(bloodrush
     src/particles.cpp
     src/style_meter.cpp
     src/sounds.cpp
+    src/cutscene.cpp
 )
 
 target_link_libraries(bloodrush PRIVATE raylib)

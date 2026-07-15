@@ -21,6 +21,8 @@ constexpr float CHARGED_DMG = 110, CHARGED_CD = 1.1f, CHARGE_TIME = 0.6f, CHARGE
 constexpr int   PELLETS = 10;
 constexpr float PELLET_DMG = 9, PELLET_SPEED = 42, PELLET_LIFE = 0.9f;
 constexpr float SHOTGUN_CD = 0.75f, PELLET_HEAL = 3, PELLET_RADIUS = 0.14f;
+constexpr float NAIL_DMG = 7, NAIL_SPEED = 65, NAIL_CD = 0.085f, NAIL_HEAL = 1.5f;
+constexpr float RAIL_DMG = 160, RAIL_CD = 3.2f, RAIL_HEAL = 30;
 constexpr float HEAL_RANGE = 10.0f;     // blood heals only up close
 constexpr float PARRY_POINTS = 25;
 
@@ -28,6 +30,7 @@ constexpr Color GUN_DARK   = { 82, 76, 84, 255 };
 constexpr Color GUN_BLACK  = { 36, 30, 34, 255 };
 constexpr Color GUN_RED    = { 150, 18, 26, 255 };
 constexpr Color GUN_YELLOW = { 255, 230, 0, 255 };
+constexpr Color GUN_GOLD   = { 255, 220, 120, 255 };
 
 float Rnd2() { return (float)rand() / (float)RAND_MAX * 2.0f - 1.0f; }
 
@@ -54,12 +57,24 @@ HitScan ScanWalls(Ray ray, const Arena& arena) {
     return h;
 }
 
+const char* WeaponName(WeaponType t) {
+    switch (t) {
+        case WeaponType::Revolver:   return "REVOLVER [1]";
+        case WeaponType::Shotgun:    return "SHOTGUN [2]";
+        case WeaponType::Nailgun:    return "NAILGUN [3]";
+        case WeaponType::Railcannon: return "RAILCANNON [4]";
+    }
+    return "";
+}
+
 } // namespace
 
 void Weapons::Reset() {
     current = WeaponType::Revolver;
     cd_ = charge_ = recoil_ = muzzle_ = hitMarker_ = bobT_ = 0;
-    charging_ = chargeReady_ = false;
+    spin_ = spinVel_ = swayX_ = swayY_ = 0;
+    cdMax_ = 1;
+    charging_ = false;
     switchT_ = 1;
     beams_.clear();
     pellets_.clear();
@@ -106,7 +121,7 @@ void Weapons::FireRevolver(Player& pl, const Arena& arena, EnemyManager& enemies
     }
     for (EnemyShot& s : enemies.Shots()) {
         if (!s.alive) continue;
-        RayCollision rc = GetRayCollisionSphere(ray, s.pos, 0.45f); // generous parry box
+        RayCollision rc = GetRayCollisionSphere(ray, s.pos, 0.45f);
         if (rc.hit && rc.distance < bestDist) {
             bestDist = rc.distance;
             bestShot = &s;
@@ -133,7 +148,7 @@ void Weapons::FireRevolver(Player& pl, const Arena& arena, EnemyManager& enemies
 
     beams_.push_back({ MuzzleWorld(pl), hitPoint, 0.07f, 0.07f,
                        { 255, 230, 120, 255 }, 0.025f });
-    cd_ = REVOLVER_CD;
+    cd_ = cdMax_ = REVOLVER_CD;
     recoil_ = 1.0f;
     muzzle_ = 1.0f;
     pl.AddTrauma(0.12f);
@@ -147,7 +162,6 @@ void Weapons::FireCharged(Player& pl, const Arena& arena, EnemyManager& enemies,
     Ray ray{ eye, fwd };
 
     HitScan walls = ScanWalls(ray, arena);
-    // pierces everything up to the wall
     for (Enemy& e : enemies.All()) {
         if (!e.alive || e.spawnT < 1) continue;
         RayCollision rc = GetRayCollisionBox(ray, e.Box());
@@ -172,7 +186,7 @@ void Weapons::FireCharged(Player& pl, const Arena& arena, EnemyManager& enemies,
 
     beams_.push_back({ MuzzleWorld(pl), endPoint, 0.22f, 0.22f,
                        { 230, 30, 40, 255 }, 0.09f });
-    cd_ = CHARGED_CD;
+    cd_ = cdMax_ = CHARGED_CD;
     recoil_ = 1.6f;
     muzzle_ = 1.0f;
     pl.AddTrauma(0.35f);
@@ -180,7 +194,6 @@ void Weapons::FireCharged(Player& pl, const Arena& arena, EnemyManager& enemies,
 }
 
 void Weapons::FireShotgun(Player& pl, ParticleSystem& fx) {
-    Vector3 eye = pl.EyePos();
     Vector3 fwd = pl.Forward();
     Vector3 right = Vector3Normalize(Vector3CrossProduct(fwd, { 0, 1, 0 }));
     Vector3 up = Vector3CrossProduct(right, fwd);
@@ -192,14 +205,74 @@ void Weapons::FireShotgun(Player& pl, ParticleSystem& fx) {
         d = Vector3Add(d, Vector3Scale(up, Rnd2() * 0.085f));
         d = Vector3Normalize(d);
         pellets_.push_back({ muzzle, Vector3Scale(d, PELLET_SPEED * (0.9f + 0.2f * Rnd2())),
-                             PELLET_LIFE, true });
+                             PELLET_LIFE, PELLET_DMG, PELLET_HEAL, true });
     }
     fx.Puff(muzzle, { 255, 160, 20, 255 }, 6, 3.0f, 0.07f, 0.15f);
-    cd_ = SHOTGUN_CD;
+    cd_ = cdMax_ = SHOTGUN_CD;
     recoil_ = 1.4f;
     muzzle_ = 1.0f;
     pl.AddTrauma(0.22f);
     sfx::Play(sfx::SHOTGUN);
+}
+
+void Weapons::FireNailgun(Player& pl, ParticleSystem& fx) {
+    Vector3 fwd = pl.Forward();
+    Vector3 right = Vector3Normalize(Vector3CrossProduct(fwd, { 0, 1, 0 }));
+    Vector3 up = Vector3CrossProduct(right, fwd);
+    Vector3 muzzle = MuzzleWorld(pl);
+
+    Vector3 d = fwd;
+    d = Vector3Add(d, Vector3Scale(right, Rnd2() * 0.02f));
+    d = Vector3Add(d, Vector3Scale(up, Rnd2() * 0.02f));
+    d = Vector3Normalize(d);
+    pellets_.push_back({ muzzle, Vector3Scale(d, NAIL_SPEED),
+                         1.2f, NAIL_DMG, NAIL_HEAL, true });
+    cd_ = cdMax_ = NAIL_CD;
+    recoil_ = std::min(recoil_ + 0.25f, 0.6f);
+    muzzle_ = 0.6f;
+    spinVel_ = 900.0f;
+    pl.AddTrauma(0.03f);
+    sfx::Play(sfx::NAIL, 0.7f);
+}
+
+void Weapons::FireRailcannon(Player& pl, const Arena& arena, EnemyManager& enemies,
+                             ParticleSystem& fx, StyleMeter& style) {
+    Vector3 eye = pl.EyePos();
+    Vector3 fwd = pl.Forward();
+    Ray ray{ eye, fwd };
+
+    HitScan walls = ScanWalls(ray, arena);
+    for (Enemy& e : enemies.All()) {
+        if (!e.alive || e.spawnT < 1) continue;
+        RayCollision rc = GetRayCollisionBox(ray, e.Box());
+        if (rc.hit && rc.distance < walls.wallDist) {
+            bool killed = enemies.Damage(e, RAIL_DMG, rc.point, fwd, fx);
+            if (rc.distance < HEAL_RANGE) pl.Heal(RAIL_HEAL);
+            if (killed) OnKill(pl, style, 3);
+        }
+    }
+    for (EnemyShot& s : enemies.Shots()) {
+        if (!s.alive) continue;
+        RayCollision rc = GetRayCollisionSphere(ray, s.pos, 0.6f);
+        if (rc.hit && rc.distance < walls.wallDist) {
+            s.alive = false;
+            fx.Sparks(s.pos, 10);
+            style.AddEvent("PARRY!", PARRY_POINTS);
+        }
+    }
+    Vector3 endPoint = walls.wallDist < 1e8f
+        ? walls.wallPoint : Vector3Add(eye, Vector3Scale(fwd, 250));
+    fx.Sparks(endPoint, 24);
+
+    beams_.push_back({ MuzzleWorld(pl), endPoint, 0.3f, 0.3f,
+                       { 255, 240, 190, 255 }, 0.12f });
+    beams_.push_back({ MuzzleWorld(pl), endPoint, 0.45f, 0.45f,
+                       { 255, 220, 120, 255 }, 0.05f });
+    cd_ = cdMax_ = RAIL_CD;
+    recoil_ = 2.0f;
+    muzzle_ = 1.0f;
+    pl.AddTrauma(0.45f);
+    sfx::Play(sfx::RAIL);
 }
 
 void Weapons::UpdatePellets(Player& pl, const Arena& arena, EnemyManager& enemies,
@@ -216,10 +289,10 @@ void Weapons::UpdatePellets(Player& pl, const Arena& arena, EnemyManager& enemie
             if (!e.alive || e.spawnT < 1) continue;
             if (CheckCollisionBoxSphere(e.Box(), p.pos, PELLET_RADIUS)) {
                 Vector3 dir = Vector3Normalize(p.vel);
-                bool killed = enemies.Damage(e, PELLET_DMG, p.pos, dir, fx);
+                bool killed = enemies.Damage(e, p.dmg, p.pos, dir, fx);
                 float dist = Vector3Distance(pl.pos, e.pos);
-                if (dist < HEAL_RANGE) pl.Heal(PELLET_HEAL);
-                if (killed) OnKill(pl, style, 1);
+                if (dist < HEAL_RANGE) pl.Heal(p.heal);
+                if (killed) OnKill(pl, style, p.dmg == NAIL_DMG ? 2 : 1);
                 else hitMarker_ = std::max(hitMarker_, 0.1f);
                 p.alive = false;
                 break;
@@ -262,19 +335,29 @@ void Weapons::Update(Player& pl, const Arena& arena, EnemyManager& enemies,
     switchT_ = std::min(1.0f, switchT_ + dt * 4);
     if (pl.grounded) bobT_ += dt * pl.HorizontalSpeed();
 
+    // nailgun barrel spin-down + viewmodel look sway
+    spin_ += spinVel_ * dt;
+    spinVel_ = std::max(0.0f, spinVel_ - dt * 1400.0f);
+    Vector2 md = GetMouseDelta();
+    swayX_ += (Clamp(-md.x * 0.0022f, -0.05f, 0.05f) - swayX_) * std::min(1.0f, dt * 10);
+    swayY_ += (Clamp(md.y * 0.0018f, -0.04f, 0.04f) - swayY_) * std::min(1.0f, dt * 10);
+
     for (auto& b : beams_) b.t -= dt;
     beams_.erase(std::remove_if(beams_.begin(), beams_.end(),
                                 [](const Beam& b) { return b.t <= 0; }),
                  beams_.end());
 
-    // switching
+    // switching: 1-4 keys or mouse wheel cycling
     WeaponType want = current;
     if (IsKeyPressed(KEY_ONE)) want = WeaponType::Revolver;
     if (IsKeyPressed(KEY_TWO)) want = WeaponType::Shotgun;
+    if (IsKeyPressed(KEY_THREE)) want = WeaponType::Nailgun;
+    if (IsKeyPressed(KEY_FOUR)) want = WeaponType::Railcannon;
     float wheel = GetMouseWheelMove();
-    if (wheel != 0)
-        want = current == WeaponType::Revolver ? WeaponType::Shotgun
-                                               : WeaponType::Revolver;
+    if (wheel != 0) {
+        int idx = ((int)current + (wheel > 0 ? 1 : NUM_WEAPONS - 1)) % NUM_WEAPONS;
+        want = (WeaponType)idx;
+    }
     if (want != current) {
         current = want;
         switchT_ = 0;
@@ -300,10 +383,12 @@ void Weapons::Update(Player& pl, const Arena& arena, EnemyManager& enemies,
     }
 
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && cd_ <= 0 && !charging_) {
-        if (current == WeaponType::Revolver)
-            FireRevolver(pl, arena, enemies, fx, style);
-        else
-            FireShotgun(pl, fx);
+        switch (current) {
+            case WeaponType::Revolver:   FireRevolver(pl, arena, enemies, fx, style); break;
+            case WeaponType::Shotgun:    FireShotgun(pl, fx); break;
+            case WeaponType::Nailgun:    FireNailgun(pl, fx); break;
+            case WeaponType::Railcannon: FireRailcannon(pl, arena, enemies, fx, style); break;
+        }
     }
 
     UpdatePellets(pl, arena, enemies, fx, style, dt);
@@ -318,7 +403,7 @@ void Weapons::Draw3D() const {
     }
     for (const auto& p : pellets_) {
         if (!p.alive) continue;
-        DrawSphere(p.pos, 0.09f, { 255, 200, 60, 255 });
+        DrawSphere(p.pos, p.dmg == NAIL_DMG ? 0.06f : 0.09f, { 255, 200, 60, 255 });
     }
 }
 
@@ -331,35 +416,69 @@ void Weapons::DrawViewmodel(const Player& pl) const {
     rlRotatef(pl.pitch, 1, 0, 0);
 
     // local space: -Z is forward, +X right, +Y up
-    float raise = (1.0f - switchT_) * -0.45f; // gun rises after switch
+    float raise = (1.0f - switchT_) * -0.45f;
     float bobY = sinf(bobT_ * 0.55f) * 0.008f * Clamp(pl.HorizontalSpeed() / 12.0f, 0.0f, 2.0f);
-    rlTranslatef(0.30f, -0.30f + raise + bobY, -0.55f);
+    rlTranslatef(0.30f + swayX_, -0.30f + raise + bobY + swayY_, -0.55f);
     rlTranslatef(0, recoil_ * 0.03f, recoil_ * 0.13f);
     rlRotatef(recoil_ * 14, 1, 0, 0);
 
-    if (current == WeaponType::Revolver) {
-        Color barrelCol = GUN_DARK;
-        if (charging_) barrelCol = Mix(GUN_DARK, { 230, 30, 40, 255 }, charge_);
-        DrawCube({ 0, 0.02f, -0.34f }, 0.055f, 0.075f, 0.42f, barrelCol);   // barrel
-        DrawCube({ 0, 0.075f, -0.50f }, 0.02f, 0.035f, 0.03f, GUN_YELLOW);  // sight
-        DrawCube({ 0, 0.0f, -0.10f }, 0.08f, 0.115f, 0.18f, GUN_BLACK);     // cylinder
-        DrawCube({ 0, -0.10f, 0.02f }, 0.06f, 0.16f, 0.09f, GUN_RED);       // grip
-        DrawCube({ 0, -0.10f, 0.02f }, 0.075f, 0.06f, 0.105f, GUN_BLACK);   // hand
-    } else {
-        DrawCube({ -0.025f, 0.02f, -0.42f }, 0.05f, 0.06f, 0.62f, GUN_DARK); // barrels
-        DrawCube({ 0.025f, 0.02f, -0.42f }, 0.05f, 0.06f, 0.62f, GUN_DARK);
-        DrawCube({ 0, 0.02f, -0.70f }, 0.115f, 0.075f, 0.06f, GUN_YELLOW);   // muzzle band
-        DrawCube({ 0, -0.015f, -0.05f }, 0.11f, 0.13f, 0.3f, GUN_BLACK);     // receiver
-        DrawCube({ 0, -0.11f, 0.10f }, 0.07f, 0.15f, 0.12f, GUN_RED);        // grip
-        DrawCube({ 0, -0.045f, -0.38f }, 0.09f, 0.07f, 0.14f, GUN_RED);      // pump
-        DrawCube({ 0, -0.045f, -0.38f }, 0.105f, 0.055f, 0.08f, GUN_BLACK);  // fore hand
-        DrawCube({ 0, -0.11f, 0.10f }, 0.085f, 0.06f, 0.135f, GUN_BLACK);    // rear hand
+    switch (current) {
+        case WeaponType::Revolver: {
+            Color barrelCol = GUN_DARK;
+            if (charging_) barrelCol = Mix(GUN_DARK, { 230, 30, 40, 255 }, charge_);
+            DrawCube({ 0, 0.02f, -0.34f }, 0.055f, 0.075f, 0.42f, barrelCol);
+            DrawCube({ 0, 0.075f, -0.50f }, 0.02f, 0.035f, 0.03f, GUN_YELLOW);
+            DrawCube({ 0, 0.0f, -0.10f }, 0.08f, 0.115f, 0.18f, GUN_BLACK);
+            DrawCube({ 0, -0.10f, 0.02f }, 0.06f, 0.16f, 0.09f, GUN_RED);
+            DrawCube({ 0, -0.10f, 0.02f }, 0.075f, 0.06f, 0.105f, GUN_BLACK);
+            break;
+        }
+        case WeaponType::Shotgun: {
+            DrawCube({ -0.025f, 0.02f, -0.42f }, 0.05f, 0.06f, 0.62f, GUN_DARK);
+            DrawCube({ 0.025f, 0.02f, -0.42f }, 0.05f, 0.06f, 0.62f, GUN_DARK);
+            DrawCube({ 0, 0.02f, -0.70f }, 0.115f, 0.075f, 0.06f, GUN_YELLOW);
+            DrawCube({ 0, -0.015f, -0.05f }, 0.11f, 0.13f, 0.3f, GUN_BLACK);
+            DrawCube({ 0, -0.11f, 0.10f }, 0.07f, 0.15f, 0.12f, GUN_RED);
+            DrawCube({ 0, -0.045f, -0.38f }, 0.09f, 0.07f, 0.14f, GUN_RED);
+            DrawCube({ 0, -0.045f, -0.38f }, 0.105f, 0.055f, 0.08f, GUN_BLACK);
+            DrawCube({ 0, -0.11f, 0.10f }, 0.085f, 0.06f, 0.135f, GUN_BLACK);
+            break;
+        }
+        case WeaponType::Nailgun: {
+            DrawCube({ 0, -0.01f, -0.10f }, 0.12f, 0.14f, 0.34f, GUN_BLACK);   // body
+            DrawCube({ 0, -0.13f, 0.02f }, 0.06f, 0.14f, 0.09f, GUN_RED);      // grip
+            DrawCube({ 0, -0.12f, -0.22f }, 0.09f, 0.16f, 0.09f, GUN_DARK);    // mag
+            // rotating 4-barrel cluster
+            rlPushMatrix();
+            rlTranslatef(0, 0.0f, -0.42f);
+            rlRotatef(spin_, 0, 0, 1);
+            for (int i = 0; i < 4; i++) {
+                rlPushMatrix();
+                rlRotatef(90.0f * i, 0, 0, 1);
+                DrawCube({ 0.045f, 0, 0 }, 0.035f, 0.035f, 0.34f, GUN_DARK);
+                rlPopMatrix();
+            }
+            rlPopMatrix();
+            DrawCube({ 0, 0, -0.60f }, 0.13f, 0.13f, 0.04f, GUN_YELLOW);       // muzzle ring
+            break;
+        }
+        case WeaponType::Railcannon: {
+            float ready = 1.0f - Clamp(cd_ / RAIL_CD, 0.0f, 1.0f);
+            Color coil = Mix(GUN_DARK, GUN_GOLD, ready);
+            DrawCube({ 0, 0.0f, -0.30f }, 0.09f, 0.11f, 0.85f, GUN_BLACK);     // rail body
+            DrawCube({ 0, -0.12f, 0.05f }, 0.06f, 0.15f, 0.1f, GUN_RED);       // grip
+            for (int i = 0; i < 3; i++)                                        // coils
+                DrawCube({ 0, 0.0f, -0.18f - 0.2f * i }, 0.15f, 0.15f, 0.05f, coil);
+            DrawCube({ 0, 0.0f, -0.74f }, 0.05f, 0.05f, 0.1f, coil);           // emitter
+            break;
+        }
     }
 
     if (muzzle_ > 0) {
         float m = muzzle_;
-        Vector3 mp = current == WeaponType::Revolver
-            ? Vector3{ 0, 0.02f, -0.58f } : Vector3{ 0, 0.02f, -0.78f };
+        Vector3 mp = { 0, 0.02f, -0.62f };
+        if (current == WeaponType::Shotgun) mp.z = -0.78f;
+        if (current == WeaponType::Railcannon) mp.z = -0.84f;
         DrawSphere(mp, 0.05f + 0.06f * m, { 255, 230, 0, 255 });
         DrawSphere(mp, 0.03f + 0.03f * m, { 255, 255, 200, 255 });
     }
@@ -369,21 +488,23 @@ void Weapons::DrawViewmodel(const Player& pl) const {
 void Weapons::DrawHUD() const {
     const int W = cfg::RENDER_W, H = cfg::RENDER_H;
 
-    // weapon name bottom right
-    const char* name = current == WeaponType::Revolver ? "REVOLVER [1]" : "SHOTGUN [2]";
+    const char* name = WeaponName(current);
     DrawText(name, W - MeasureText(name, 20) - 16, H - 40, 20, { 235, 230, 230, 255 });
-    // cooldown ticker
     if (cd_ > 0)
-        DrawRectangle(W - 116, H - 16, (int)(100 * (1.0f - cd_ / SHOTGUN_CD)), 4,
+        DrawRectangle(W - 116, H - 16, (int)(100 * (1.0f - cd_ / cdMax_)), 4,
                       { 120, 60, 64, 255 });
 
-    // charge ring around the crosshair
     if (charging_) {
         Color c = charge_ >= 1.0f ? Color{ 230, 30, 40, 255 } : Color{ 255, 230, 0, 255 };
         DrawRing({ (float)W / 2, (float)H / 2 }, 10, 13, -90, -90 + 360 * charge_, 24, c);
     }
+    // railcannon readiness ring
+    if (current == WeaponType::Railcannon && cd_ > 0) {
+        float t = 1.0f - cd_ / RAIL_CD;
+        DrawRing({ (float)W / 2, (float)H / 2 }, 14, 16, -90, -90 + 360 * t, 24,
+                 { 255, 220, 120, 160 });
+    }
 
-    // hitmarker
     if (hitMarker_ > 0) {
         Color c = { 255, 230, 0, 255 };
         DrawLine(W / 2 - 9, H / 2 - 9, W / 2 - 4, H / 2 - 4, c);

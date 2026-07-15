@@ -33,7 +33,7 @@ modules:
     sources:
       - type: git
         url: https://github.com/shidikusik/Fps.git
-        # For a Flathub submission, create a release tag (e.g. v0.1.0 on
-        # GitHub: Releases -> Draft a new release) and add `tag: v0.1.0`
-        # alongside an updated commit.
-        commit: ef1885791f003576d579d6e9e171e52f2eccf83d
+        # CI builds the latest branch state. For a Flathub submission,
+        # replace `branch` with a release `tag:` plus a pinned `commit:`
+        # (create the tag on GitHub: Releases -> Draft a new release).
+        branch: claude/bloodrush-fps-game-01wbax

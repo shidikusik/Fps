@@ -1,6 +1,5 @@
 // BLOODRUSH — fast-paced arena FPS.
-// Movement (bhop/dash/slide/slam) + revolver/shotgun + 3 enemy types,
-// wave system, style meter, blood healing, procedural sound, game menu.
+// Three levels, story cutscenes, four weapons, a boss, endless NG+ loops.
 
 #include "raylib.h"
 #include "raymath.h"
@@ -8,6 +7,7 @@
 
 #include "arena.h"
 #include "config.h"
+#include "cutscene.h"
 #include "enemies.h"
 #include "particles.h"
 #include "player.h"
@@ -19,6 +19,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
+#include <vector>
 
 namespace {
 
@@ -27,7 +29,44 @@ constexpr Color HUD_YELLOW = { 255, 230, 0, 255 };
 constexpr Color HUD_WHITE  = { 235, 230, 230, 255 };
 constexpr Color HUD_DIM    = { 120, 60, 64, 255 };
 
-enum class GameState { Menu, Playing, Paused, Dead };
+enum class GameState { Menu, Cutscene, Playing, Paused, Dead };
+enum class AfterCutscene { BeginRun, ResumePlay };
+
+std::vector<std::string> IntroLines() {
+    return {
+        "EARTH IS SILENT.",
+        "MACHINE UNIT V-13 REACTIVATES.",
+        "FUEL RESERVES: EMPTY.",
+        "ALTERNATIVE SOURCE LOCATED: BLOOD.",
+        "THE TOWER CALLS. DESCEND.",
+    };
+}
+
+std::vector<std::string> LevelLines(int level) {
+    if (level == 2) return {
+        "LAYER CLEARED.",
+        "BELOW THE YARD: THE CATACOMBS.",
+        "THE DEAD HERE DO NOT REST.",
+        "THEY KNOW YOU ARE COMING.",
+    };
+    return {
+        "THE CATACOMBS FALL SILENT.",
+        "ONE LAYER REMAINS: THE ALTAR.",
+        "SOMETHING ANCIENT GUARDS IT.",
+        "THE WARDEN STIRS.",
+    };
+}
+
+std::vector<std::string> VictoryLines(int nextLoop) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "LOOP %d. NOTHING LEFT BUT VIOLENCE.", nextLoop + 1);
+    return {
+        "THE WARDEN FALLS.",
+        "THE TOWER OFFERS NO EXIT.",
+        "ONLY DEEPER.",
+        std::string(buf),
+    };
+}
 
 PlayerInput GatherInput() {
     PlayerInput in;
@@ -48,8 +87,14 @@ void DrawCenteredText(const char* text, int y, int size, Color col) {
     DrawText(text, cfg::RENDER_W / 2 - MeasureText(text, size) / 2, y, size, col);
 }
 
+void DrawSky() {
+    // deep gradient behind everything
+    DrawRectangleGradientV(0, 0, cfg::RENDER_W, cfg::RENDER_H,
+                           { 16, 4, 10, 255 }, { 4, 2, 6, 255 });
+}
+
 void DrawGameHud(const Player& player, const EnemyManager& enemies,
-                 const StyleMeter& style) {
+                 const StyleMeter& style, const Arena& arena) {
     const int W = cfg::RENDER_W, H = cfg::RENDER_H;
 
     // Crosshair
@@ -60,7 +105,7 @@ void DrawGameHud(const Player& player, const EnemyManager& enemies,
 
     // Speed (bottom left)
     float speed = player.HorizontalSpeed();
-    char buf[64];
+    char buf[96];
     snprintf(buf, sizeof(buf), "%5.1f", speed);
     Color speedCol = HUD_WHITE;
     if (speed > cfg::WALK_SPEED * 1.2f) speedCol = HUD_YELLOW;
@@ -89,14 +134,13 @@ void DrawGameHud(const Player& player, const EnemyManager& enemies,
     else if (!player.grounded) state = "AIR";
     if (state) DrawText(state, 16, H - 108, 20, HUD_RED);
 
-    // Health (bottom center) — blood is fuel, it does not regen
+    // Health (bottom center)
     int hp = (int)ceilf(player.hp);
     Color hpCol = hp > 30 ? HUD_RED : Color{ 255, 60, 30, 255 };
     float pulse = hp <= 30 ? (0.5f + 0.5f * sinf((float)GetTime() * 9)) : 1.0f;
     snprintf(buf, sizeof(buf), "%d", hp < 0 ? 0 : hp);
     int bx = W / 2 - 110;
-    DrawText(buf, bx - MeasureText(buf, 34) - 10, H - 46, 34,
-             Fade(hpCol, pulse));
+    DrawText(buf, bx - MeasureText(buf, 34) - 10, H - 46, 34, Fade(hpCol, pulse));
     DrawRectangle(bx, H - 34, 220, 12, { 40, 20, 22, 255 });
     DrawRectangle(bx, H - 34, (int)(220 * Clamp(player.hp / player.maxHp, 0.0f, 1.0f)),
                   12, Fade(hpCol, pulse));
@@ -104,40 +148,56 @@ void DrawGameHud(const Player& player, const EnemyManager& enemies,
     if (player.healFlash > 0)
         DrawText("+BLOOD", bx + 228, H - 40, 16, Fade(HUD_YELLOW, player.healFlash));
 
-    // Wave + score (top)
+    // Level / wave / score (top)
     if (enemies.waveActive) {
-        snprintf(buf, sizeof(buf), "WAVE %d — %d LEFT", enemies.wave, enemies.AliveCount());
+        snprintf(buf, sizeof(buf), "%s — WAVE %d/%d — %d LEFT", arena.Name(),
+                 enemies.waveInLevel, EnemyManager::WAVES_PER_LEVEL, enemies.AliveCount());
         DrawCenteredText(buf, 10, 20, HUD_WHITE);
-    } else {
-        snprintf(buf, sizeof(buf), "WAVE %d IN %d", enemies.wave + 1,
+    } else if (!enemies.levelCleared) {
+        snprintf(buf, sizeof(buf), "WAVE %d IN %d", enemies.waveInLevel + 1,
                  (int)ceilf(enemies.intermission));
         DrawCenteredText(buf, 10, 26, HUD_YELLOW);
-        if (enemies.wave > 0)
+        if (enemies.waveInLevel > 0)
             DrawCenteredText("WAVE CLEARED", 40, 16, HUD_DIM);
+    }
+    if (enemies.loop > 0) {
+        snprintf(buf, sizeof(buf), "LOOP %d", enemies.loop + 1);
+        DrawText(buf, 16, 10, 20, HUD_RED);
     }
     snprintf(buf, sizeof(buf), "%ld", style.score);
     DrawText(buf, W - MeasureText(buf, 26) - 16, 10, 26, HUD_YELLOW);
 
-    DrawFPS(8, 8);
+    // Boss bar
+    if (const Enemy* boss = enemies.Boss()) {
+        float bt = Clamp(boss->hp / boss->maxHp, 0.0f, 1.0f);
+        int bw = 420, bx2 = W / 2 - bw / 2, by = 44;
+        DrawCenteredText("THE WARDEN", by - 4, 18, { 255, 220, 120, 255 });
+        DrawRectangle(bx2, by + 16, bw, 10, { 40, 20, 22, 255 });
+        DrawRectangle(bx2, by + 16, (int)(bw * bt), 10, HUD_RED);
+        DrawRectangleLines(bx2 - 1, by + 15, bw + 2, 12, { 255, 220, 120, 255 });
+    }
+
+    DrawFPS(8, H - 26);
 }
 
 void DrawMenu() {
     const int W = cfg::RENDER_W, H = cfg::RENDER_H;
     DrawRectangle(0, 0, W, H, { 8, 4, 6, 140 });
-    DrawCenteredText("BLOODRUSH", H / 2 - 130, 70, HUD_RED);
-    DrawCenteredText("MANKIND IS DEAD. BLOOD IS FUEL.", H / 2 - 55, 16, HUD_DIM);
+    DrawCenteredText("BLOODRUSH", H / 2 - 160, 80, HUD_RED);
+    DrawCenteredText("MANKIND IS DEAD. BLOOD IS FUEL.", H / 2 - 70, 18, HUD_DIM);
     if (fmodf((float)GetTime() * 1.6f, 1.0f) > 0.35f)
-        DrawCenteredText("CLICK OR ENTER TO START", H / 2, 26, HUD_YELLOW);
+        DrawCenteredText("CLICK OR ENTER TO START", H / 2 - 10, 28, HUD_YELLOW);
 
     const char* lines[] = {
         "WASD + mouse  move    SPACE hold  bunny hop",
         "SHIFT  dash    CTRL  slide / air slam",
-        "LMB  fire    RMB hold  charged shot    1/2  weapons",
+        "LMB  fire    RMB hold  charged shot    1-4  weapons",
         "Blood heals: deal damage up close",
+        "3 layers. 4 waves each. The Warden waits below.",
     };
-    for (int i = 0; i < 4; i++)
-        DrawCenteredText(lines[i], H / 2 + 60 + i * 22, 16, HUD_WHITE);
-    DrawCenteredText("Q — QUIT", H - 30, 16, HUD_DIM);
+    for (int i = 0; i < 5; i++)
+        DrawCenteredText(lines[i], H / 2 + 60 + i * 24, 17, HUD_WHITE);
+    DrawCenteredText("Q — QUIT", H - 34, 16, HUD_DIM);
 }
 
 void DrawPauseOverlay() {
@@ -147,16 +207,36 @@ void DrawPauseOverlay() {
     DrawCenteredText("ESC / CLICK — resume        Q — menu", H / 2 + 20, 18, HUD_WHITE);
 }
 
-void DrawDeathOverlay(const EnemyManager& enemies, const StyleMeter& style) {
+void DrawDeathOverlay(const EnemyManager& enemies, const StyleMeter& style,
+                      const Arena& arena) {
     const int W = cfg::RENDER_W, H = cfg::RENDER_H;
     DrawRectangle(0, 0, W, H, { 40, 0, 4, 190 });
-    DrawCenteredText("YOU DIED", H / 2 - 90, 60, HUD_RED);
-    char buf[96];
-    snprintf(buf, sizeof(buf), "WAVE %d      SCORE %ld", enemies.wave, style.score);
-    DrawCenteredText(buf, H / 2 - 10, 26, HUD_WHITE);
+    DrawCenteredText("YOU DIED", H / 2 - 100, 64, HUD_RED);
+    char buf[128];
+    if (enemies.loop > 0)
+        snprintf(buf, sizeof(buf), "%s — WAVE %d — LOOP %d — SCORE %ld",
+                 arena.Name(), enemies.waveInLevel, enemies.loop + 1, style.score);
+    else
+        snprintf(buf, sizeof(buf), "%s — WAVE %d — SCORE %ld",
+                 arena.Name(), enemies.waveInLevel, style.score);
+    DrawCenteredText(buf, H / 2 - 14, 26, HUD_WHITE);
     if (fmodf((float)GetTime() * 1.6f, 1.0f) > 0.35f)
-        DrawCenteredText("CLICK — RETRY", H / 2 + 50, 22, HUD_YELLOW);
-    DrawCenteredText("Q — MENU", H / 2 + 84, 16, HUD_DIM);
+        DrawCenteredText("CLICK / ENTER — RETRY", H / 2 + 50, 22, HUD_YELLOW);
+    DrawCenteredText("Q — MENU", H / 2 + 86, 16, HUD_DIM);
+}
+
+Camera3D CinematicCamera(float t01, int level) {
+    // slow dolly-in during cutscenes / menu orbit
+    Camera3D cam{};
+    float ang = 0.6f + t01 * 0.9f;
+    float rad = 58.0f - t01 * 22.0f;
+    float height = 26.0f - t01 * 8.0f + level * 2.0f;
+    cam.position = { sinf(ang) * rad, height, cosf(ang) * rad };
+    cam.target = { 0, 5.0f + level, 0 };
+    cam.up = { 0, 1, 0 };
+    cam.fovy = 66;
+    cam.projection = CAMERA_PERSPECTIVE;
+    return cam;
 }
 
 } // namespace
@@ -172,17 +252,20 @@ int main() {
     Shader shading = LoadShadingShader();
 
     Arena arena;
-    arena.Init();
+    arena.Init(1);
 
     Player player;
     EnemyManager enemies;
     ParticleSystem particles;
     StyleMeter style;
     Weapons weapons;
+    Cutscene cutscene;
+    AfterCutscene afterCutscene = AfterCutscene::BeginRun;
 
     auto resetRun = [&]() {
+        arena.Init(1);
         player.Init(arena.SpawnPoint());
-        enemies.Reset();
+        enemies.BeginLevel(1, 0);
         particles.Reset();
         style.Reset();
         weapons.Reset();
@@ -191,7 +274,6 @@ int main() {
     GameState state = GameState::Menu;
     float shakeTime = 0;
     bool quit = false;
-    // dev/CI hook: aim at the nearest enemy automatically
     const bool autoAim = getenv("BLOODRUSH_AUTOTEST") != nullptr;
 
     while (!WindowShouldClose() && !quit) {
@@ -202,11 +284,23 @@ int main() {
             case GameState::Menu:
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER)) {
                     resetRun();
-                    state = GameState::Playing;
-                    DisableCursor();
+                    cutscene.Start(IntroLines());
+                    afterCutscene = AfterCutscene::BeginRun;
+                    state = GameState::Cutscene;
                     sfx::Play(sfx::CLICK);
                 }
                 if (IsKeyPressed(KEY_Q)) quit = true;
+                break;
+
+            case GameState::Cutscene:
+                cutscene.Update(dt);
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER) ||
+                    IsKeyPressed(KEY_ESCAPE))
+                    cutscene.Skip();
+                if (cutscene.Finished()) {
+                    state = GameState::Playing;
+                    DisableCursor();
+                }
                 break;
 
             case GameState::Playing: {
@@ -236,6 +330,36 @@ int main() {
                 particles.Update(dt);
                 style.Update(dt);
                 shakeTime += dt * 40.0f;
+
+                // level progression
+                if (enemies.levelCleared) {
+                    if (arena.Level() < Arena::NUM_LEVELS) {
+                        int next = arena.Level() + 1;
+                        arena.Init(next);
+                        enemies.BeginLevel(next, enemies.loop);
+                        player.pos = arena.SpawnPoint();
+                        player.vel = { 0, 0, 0 };
+                        player.Heal(50);
+                        particles.Reset();
+                        cutscene.Start(LevelLines(next));
+                    } else {
+                        // Warden down: victory, then loop deeper
+                        int nextLoop = enemies.loop + 1;
+                        style.score += 2000L * nextLoop;
+                        arena.Init(1);
+                        enemies.BeginLevel(1, nextLoop);
+                        player.pos = arena.SpawnPoint();
+                        player.vel = { 0, 0, 0 };
+                        player.hp = player.maxHp;
+                        particles.Reset();
+                        cutscene.Start(VictoryLines(enemies.loop));
+                    }
+                    afterCutscene = AfterCutscene::ResumePlay;
+                    state = GameState::Cutscene;
+                    EnableCursor();
+                    break;
+                }
+
                 if (player.Dead()) {
                     state = GameState::Dead;
                     player.AddTrauma(1.0f);
@@ -254,7 +378,7 @@ int main() {
                 break;
 
             case GameState::Dead:
-                particles.Update(dt); // let the gore settle behind the overlay
+                particles.Update(dt);
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER)) {
                     resetRun();
                     state = GameState::Playing;
@@ -265,16 +389,12 @@ int main() {
                 break;
         }
 
-        // Camera: gameplay cam or slow menu orbit
+        // Camera
         Camera3D cam;
         if (state == GameState::Menu) {
-            float t = (float)GetTime() * 0.15f;
-            cam = {};
-            cam.position = { sinf(t) * 48, 24, cosf(t) * 48 };
-            cam.target = { 0, 4, 0 };
-            cam.up = { 0, 1, 0 };
-            cam.fovy = 70;
-            cam.projection = CAMERA_PERSPECTIVE;
+            cam = CinematicCamera(fmodf((float)GetTime() * 0.02f, 1.0f), arena.Level());
+        } else if (state == GameState::Cutscene) {
+            cam = CinematicCamera(cutscene.Progress(), arena.Level());
         } else {
             float sh = player.trauma * player.trauma;
             float shakeX = sh * 2.2f * sinf(shakeTime * 1.13f) * cosf(shakeTime * 0.71f);
@@ -282,9 +402,10 @@ int main() {
             cam = player.GetCamera(shakeX, shakeY);
         }
 
-        // --- render into the low-res target ---
+        // --- render into the target ---
         BeginTextureMode(target);
         ClearBackground({ 8, 4, 6, 255 });
+        DrawSky();
         BeginMode3D(cam);
         BeginShaderMode(shading);
         arena.Draw();
@@ -294,8 +415,9 @@ int main() {
         EndShaderMode();
         EndMode3D();
 
-        if (state != GameState::Menu) {
-            // viewmodel pass: depth test off so the gun never clips into walls
+        bool hudStates = state == GameState::Playing || state == GameState::Paused ||
+                         state == GameState::Dead;
+        if (hudStates) {
             BeginMode3D(cam);
             BeginShaderMode(shading);
             rlDrawRenderBatchActive();
@@ -306,19 +428,19 @@ int main() {
             EndShaderMode();
             EndMode3D();
 
-            // damage / heal vignette
             if (player.hurtFlash > 0)
                 DrawRectangle(0, 0, cfg::RENDER_W, cfg::RENDER_H,
                               Fade(HUD_RED, player.hurtFlash * 0.28f));
 
-            DrawGameHud(player, enemies, style);
+            DrawGameHud(player, enemies, style, arena);
             style.Draw();
             weapons.DrawHUD();
         }
 
         if (state == GameState::Menu) DrawMenu();
+        else if (state == GameState::Cutscene) cutscene.Draw();
         else if (state == GameState::Paused) DrawPauseOverlay();
-        else if (state == GameState::Dead) DrawDeathOverlay(enemies, style);
+        else if (state == GameState::Dead) DrawDeathOverlay(enemies, style, arena);
         EndTextureMode();
 
         // --- upscale to the window ---

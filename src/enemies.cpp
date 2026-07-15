@@ -18,16 +18,10 @@ namespace {
 constexpr float HUSK_HP = 60,  HUSK_SPEED = 4.6f,  HUSK_DMG = 15, HUSK_RANGE = 2.3f;
 constexpr float SHOOTER_HP = 40, SHOOTER_DMG = 12, SHOT_SPEED = 15.0f;
 constexpr float BERSERKER_HP = 110, BERSERKER_SPEED = 8.6f, BERSERKER_DMG = 25;
+constexpr float WARDEN_HP = 900, WARDEN_SPEED = 7.0f, WARDEN_DMG = 35;
 
 constexpr float SLAM_RADIUS = 6.5f, SLAM_DMG = 65.0f;
 constexpr float SHOT_RADIUS = 0.28f;
-
-const Vector3 SPAWN_PADS[] = {
-    { -40, 0.5f, -40 }, { 40, 0.5f, -40 }, { -40, 0.5f, 40 }, { 40, 0.5f, 40 },
-    { 0, 0.5f, -42 },   { 0, 0.5f, 42 },   { -42, 0.5f, 0 },  { 42, 0.5f, 0 },
-    { -22, 3.5f, -22 }, { 22, 3.5f, 22 },
-};
-constexpr int NUM_PADS = 10;
 
 float Rnd() { return (float)rand() / (float)RAND_MAX; }
 float Rnd2() { return Rnd() * 2.0f - 1.0f; }
@@ -50,6 +44,7 @@ Vector3 Enemy::HalfSize() const {
         case EnemyType::Husk:      return { 0.50f, 1.05f, 0.50f };
         case EnemyType::Shooter:   return { 0.60f, 0.60f, 0.60f };
         case EnemyType::Berserker: return { 0.75f, 0.95f, 0.75f };
+        case EnemyType::Warden:    return { 1.60f, 2.10f, 1.60f };
     }
     return { 0.5f, 0.5f, 0.5f };
 }
@@ -64,12 +59,15 @@ BoundingBox Enemy::Box() const {
              { pos.x + h.x, pos.y + h.y * 2, pos.z + h.z } };
 }
 
-void EnemyManager::Reset() {
+void EnemyManager::BeginLevel(int lvl, int lp) {
     enemies_.clear();
     shots_.clear();
-    wave = 0;
+    level = lvl;
+    loop = lp;
+    waveInLevel = 0;
     waveActive = false;
-    intermission = 2.5f; // wave 1 arrives shortly after start
+    levelCleared = false;
+    intermission = 3.0f;
 }
 
 int EnemyManager::AliveCount() const {
@@ -78,35 +76,71 @@ int EnemyManager::AliveCount() const {
     return n;
 }
 
+const Enemy* EnemyManager::Boss() const {
+    for (const Enemy& e : enemies_)
+        if (e.alive && e.type == EnemyType::Warden && e.spawnDelay <= 0) return &e;
+    return nullptr;
+}
+
 void EnemyManager::Spawn(EnemyType t, Vector3 pos, float delay) {
     Enemy e;
     e.type = t;
     e.pos = pos;
     e.spawnDelay = delay;
     e.strafeSign = Rnd() > 0.5f ? 1.0f : -1.0f;
+    float s = DiffScale();
     switch (t) {
-        case EnemyType::Husk:      e.hp = e.maxHp = HUSK_HP; break;
-        case EnemyType::Shooter:   e.hp = e.maxHp = SHOOTER_HP; e.pos.y += 3; break;
-        case EnemyType::Berserker: e.hp = e.maxHp = BERSERKER_HP; break;
+        case EnemyType::Husk:      e.hp = e.maxHp = HUSK_HP * s; break;
+        case EnemyType::Shooter:   e.hp = e.maxHp = SHOOTER_HP * s; e.pos.y += 3; break;
+        case EnemyType::Berserker: e.hp = e.maxHp = BERSERKER_HP * s; break;
+        case EnemyType::Warden:    e.hp = e.maxHp = WARDEN_HP * s; break;
     }
     enemies_.push_back(e);
 }
 
-void EnemyManager::StartWave(int w) {
-    wave = w;
+void EnemyManager::StartWave(int w, const Arena& arena) {
+    waveInLevel = w;
+    totalWaves++;
     waveActive = true;
     enemies_.erase(std::remove_if(enemies_.begin(), enemies_.end(),
                                   [](const Enemy& e) { return !e.alive; }),
                    enemies_.end());
 
-    int husks = std::min(3 + w * 2, 14);
-    int shooters = std::min(w >= 2 ? w - 1 : 0, 6);
-    int berserkers = std::min(w >= 3 ? (w - 1) / 2 : 0, 5);
+    // composition scales with level, wave and NG+ loop
+    int husks = 0, shooters = 0, berserkers = 0;
+    bool boss = false;
+    switch (level) {
+        case 1:
+            husks = 3 + w * 2;
+            shooters = w - 1;
+            berserkers = w >= 4 ? 1 : 0;
+            break;
+        case 2:
+            husks = 4 + w * 2;
+            shooters = w;
+            berserkers = (w + 1) / 2;
+            break;
+        default: // 3
+            if (w == WAVES_PER_LEVEL) {
+                boss = true;
+                husks = 4;
+                shooters = 2;
+            } else {
+                husks = 5 + w * 2;
+                shooters = w + 1;
+                berserkers = w;
+            }
+            break;
+    }
+    husks = std::min(husks + loop, 16);
+    shooters = std::min(shooters + (loop > 0 ? 1 : 0), 7);
+    berserkers = std::min(berserkers + (loop > 0 ? 1 : 0), 6);
 
-    int idx = rand() % NUM_PADS;
+    const std::vector<Vector3>& pads = arena.SpawnPads();
+    int idx = rand() % (int)pads.size();
     float delay = 0;
     auto pad = [&]() {
-        Vector3 p = SPAWN_PADS[idx++ % NUM_PADS];
+        Vector3 p = pads[idx++ % pads.size()];
         p.x += Rnd2() * 2.5f;
         p.z += Rnd2() * 2.5f;
         return p;
@@ -114,8 +148,9 @@ void EnemyManager::StartWave(int w) {
     for (int i = 0; i < husks; i++)      { Spawn(EnemyType::Husk, pad(), delay); delay += 0.35f; }
     for (int i = 0; i < shooters; i++)   { Spawn(EnemyType::Shooter, pad(), delay); delay += 0.45f; }
     for (int i = 0; i < berserkers; i++) { Spawn(EnemyType::Berserker, pad(), delay); delay += 0.6f; }
+    if (boss) Spawn(EnemyType::Warden, { 0, 13.5f, 0 }, 1.0f); // atop the spire
 
-    sfx::Play(sfx::WAVE);
+    sfx::Play(sfx::WAVE, boss ? 1.0f : 0.9f, boss ? 0.7f : 1.0f);
 }
 
 bool EnemyManager::Damage(Enemy& e, float dmg, Vector3 hitPoint, Vector3 dir,
@@ -126,8 +161,8 @@ bool EnemyManager::Damage(Enemy& e, float dmg, Vector3 hitPoint, Vector3 dir,
     fx.Blood(hitPoint, dir, 10);
     if (e.hp <= 0) {
         e.alive = false;
-        fx.BigBlood(e.Center(), 40);
-        sfx::Play(sfx::KILL);
+        fx.BigBlood(e.Center(), e.type == EnemyType::Warden ? 120 : 40);
+        sfx::Play(sfx::KILL, 1.0f, e.type == EnemyType::Warden ? 0.6f : 1.0f);
         return true;
     }
     sfx::Play(sfx::HIT, 0.8f);
@@ -195,14 +230,13 @@ void EnemyManager::UpdateShooter(Enemy& e, Player& pl, const Arena& arena,
 
     // hover: float toward player's eye level + bob
     e.animT += dt;
-    float targetY = Clamp(pl.EyePos().y + 1.5f, 2.5f, 10.0f) + sinf(e.animT * 2.2f) * 0.4f;
+    float targetY = Clamp(pl.EyePos().y + 1.5f, 2.5f, 12.0f) + sinf(e.animT * 2.2f) * 0.4f;
     e.vel.y = (targetY - e.pos.y) * 2.0f;
 
     e.cd2 -= dt;
     if (e.cd2 <= 0) { e.strafeSign = -e.strafeSign; e.cd2 = 2.0f + Rnd() * 2.5f; }
 
     if (e.attackCd <= 0 && dist < 38) {
-        // line of sight check against the level
         Vector3 from = e.Center();
         Vector3 to = pl.EyePos();
         Vector3 d = Vector3Subtract(to, from);
@@ -215,7 +249,6 @@ void EnemyManager::UpdateShooter(Enemy& e, Player& pl, const Arena& arena,
         }
         if (!blocked) {
             e.attackCd = 2.1f + Rnd() * 0.7f;
-            // slight lead on the shot
             Vector3 aim = Vector3Add(to, Vector3Scale(pl.vel, playerDist / SHOT_SPEED * 0.35f));
             Vector3 sd = Vector3Normalize(Vector3Subtract(aim, from));
             shots_.push_back({ from, Vector3Scale(sd, SHOT_SPEED), 6.0f, true });
@@ -241,17 +274,48 @@ void EnemyManager::UpdateBerserker(Enemy& e, Player& pl, float dist, Vector3 dir
     }
 }
 
+void EnemyManager::UpdateWarden(Enemy& e, Player& pl, ParticleSystem& fx,
+                                float dist, Vector3 dir, float dt) {
+    e.cd2 -= dt;
+    if (e.grounded) {
+        e.vel.x += (dir.x * WARDEN_SPEED - e.vel.x) * std::min(1.0f, dt * 5);
+        e.vel.z += (dir.z * WARDEN_SPEED - e.vel.z) * std::min(1.0f, dt * 5);
+        if (dist > 7 && dist < 20 && e.cd2 <= 0) { // long pounce
+            e.cd2 = 3.5f;
+            e.vel = { dir.x * 15, 12.0f, dir.z * 15 };
+        }
+    }
+    // landing shockwave: a ring of destructible shots
+    if (e.wasAir && e.grounded) {
+        fx.Puff(e.pos, { 255, 160, 20, 255 }, 30, 10.0f, 0.18f, 0.5f);
+        sfx::Play(sfx::SLAM, 0.9f, 0.8f);
+        Vector3 c = e.Center();
+        for (int i = 0; i < 10; i++) {
+            float a = (float)i / 10.0f * 6.2831853f;
+            Vector3 v = { cosf(a) * 11.0f, 0.5f, sinf(a) * 11.0f };
+            shots_.push_back({ { c.x, e.pos.y + 1.0f, c.z }, v, 3.0f, true });
+        }
+    }
+    e.wasAir = !e.grounded;
+    e.animT += dt * Vector2Length({ e.vel.x, e.vel.z });
+    if (dist < 4.0f && e.attackCd <= 0) {
+        e.attackCd = 1.5f;
+        pl.TakeDamage(WARDEN_DMG);
+    }
+}
+
 void EnemyManager::Update(Player& pl, const Arena& arena, ParticleSystem& fx,
                           StyleMeter& style, float dt) {
-    // --- wave state machine ---
-    if (!waveActive) {
+    // --- wave state machine (levelCleared is consumed by main) ---
+    if (!waveActive && !levelCleared) {
         intermission -= dt;
-        if (intermission <= 0) StartWave(wave + 1);
-    } else if (AliveCount() == 0) {
+        if (intermission <= 0) StartWave(waveInLevel + 1, arena);
+    } else if (waveActive && AliveCount() == 0) {
         waveActive = false;
-        intermission = 4.0f;
-        style.score += 250L * wave;
+        style.score += 250L * (waveInLevel + (level - 1) * WAVES_PER_LEVEL);
         style.AddEvent("WAVE CLEAR", 60);
+        if (waveInLevel >= WAVES_PER_LEVEL) levelCleared = true;
+        else intermission = 4.0f;
     }
 
     // --- ground slam AoE ---
@@ -268,8 +332,8 @@ void EnemyManager::Update(Player& pl, const Arena& arena, ParticleSystem& fx,
                     style.AddEvent("SLAMDUNK!", 45);
                     style.score += (long)(100 * style.Multiplier());
                     pl.Heal(15);
-                } else {
-                    e.vel.y += 8; // survivors get launched
+                } else if (e.type != EnemyType::Warden) {
+                    e.vel.y += 8; // survivors get launched (not the boss)
                 }
             }
         }
@@ -300,14 +364,15 @@ void EnemyManager::Update(Player& pl, const Arena& arena, ParticleSystem& fx,
             case EnemyType::Husk:      UpdateHusk(e, pl, dist, dir, dt); break;
             case EnemyType::Shooter:   UpdateShooter(e, pl, arena, dist, dir, dt); break;
             case EnemyType::Berserker: UpdateBerserker(e, pl, dist, dir, dt); break;
+            case EnemyType::Warden:    UpdateWarden(e, pl, fx, dist, dir, dt); break;
         }
 
         if (e.type != EnemyType::Shooter) e.vel.y -= cfg::GRAVITY * dt;
         MoveEnemy(e, arena, dt);
-        if (e.pos.y < cfg::KILL_PLANE) e.alive = false; // fell off somehow
+        if (e.pos.y < cfg::KILL_PLANE) e.alive = false;
     }
 
-    // --- cheap pairwise separation so enemies don't stack ---
+    // --- cheap pairwise separation ---
     for (size_t i = 0; i < enemies_.size(); i++) {
         Enemy& a = enemies_[i];
         if (!a.alive || a.spawnT < 1) continue;
@@ -354,7 +419,7 @@ void EnemyManager::Update(Player& pl, const Arena& arena, ParticleSystem& fx,
 void EnemyManager::Draw() const {
     for (const Enemy& e : enemies_) {
         if (!e.alive || e.spawnDelay > 0) continue;
-        float sc = e.spawnT; // materialize scale-in
+        float sc = e.spawnT;
         Vector3 c = e.Center();
         float flash = e.hitFlash;
         float yawDeg = RAD2DEG * atan2f(e.faceDir.x, e.faceDir.z);
@@ -374,21 +439,23 @@ void EnemyManager::Draw() const {
                 DrawCube({ 0, 0.9f, 0 }, 0.45f, 0.45f, 0.45f, head);
                 DrawCube({ 0.1f, 0.92f, 0.23f }, 0.09f, 0.09f, 0.05f, { 255, 230, 0, 255 });
                 DrawCube({ -0.1f, 0.92f, 0.23f }, 0.09f, 0.09f, 0.05f, { 255, 230, 0, 255 });
-                DrawCube({ 0.55f, 0.15f, sway }, 0.2f, 0.8f, 0.2f, body);   // arms
+                DrawCube({ 0.55f, 0.15f, sway }, 0.2f, 0.8f, 0.2f, body);
                 DrawCube({ -0.55f, 0.15f, -sway }, 0.2f, 0.8f, 0.2f, body);
-                DrawCube({ 0.22f, -0.85f, sway * 0.7f }, 0.25f, 0.5f, 0.25f, head); // legs
+                DrawCube({ 0.22f, -0.85f, sway * 0.7f }, 0.25f, 0.5f, 0.25f, head);
                 DrawCube({ -0.22f, -0.85f, -sway * 0.7f }, 0.25f, 0.5f, 0.25f, head);
                 break;
             }
             case EnemyType::Shooter: {
                 Color body = Mix({ 22, 16, 18, 255 }, WHITE, flash);
-                // octahedron from two 4-sided cones
+                rlPushMatrix();
+                rlRotatef(sinf(e.animT * 1.4f) * 8.0f, 0, 0, 1); // idle tilt
                 DrawCylinder({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, body);
                 DrawCylinderWires({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, { 230, 30, 40, 255 });
                 rlPushMatrix();
                 rlRotatef(180, 1, 0, 0);
                 DrawCylinder({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, body);
                 DrawCylinderWires({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, { 230, 30, 40, 255 });
+                rlPopMatrix();
                 rlPopMatrix();
                 DrawSphere({ 0, 0, 0.45f }, 0.22f, Mix({ 255, 230, 0, 255 }, WHITE, flash));
                 DrawSphere({ 0, 0, 0.58f }, 0.09f, { 20, 14, 16, 255 });
@@ -403,17 +470,36 @@ void EnemyManager::Draw() const {
                 DrawCubeWires({ 0, 0.1f, 0 }, 1.4f, 1.15f, 0.9f, { 255, 230, 0, 255 });
                 DrawCube({ 0, 0.85f, 0.15f }, 0.55f, 0.4f, 0.5f, dark);
                 DrawCube({ 0, 0.85f, 0.42f }, 0.3f, 0.08f, 0.05f, { 255, 230, 0, 255 });
-                DrawCylinder({ 0.35f, 1.0f, 0 }, 0.12f, 0.0f, 0.45f, 4, dark);  // horns
+                DrawCylinder({ 0.35f, 1.0f, 0 }, 0.12f, 0.0f, 0.45f, 4, dark);
                 DrawCylinder({ -0.35f, 1.0f, 0 }, 0.12f, 0.0f, 0.45f, 4, dark);
-                DrawCube({ 0.85f, -0.1f, 0.1f }, 0.35f, 0.9f, 0.35f, dark);     // arms
+                DrawCube({ 0.85f, -0.1f, 0.1f }, 0.35f, 0.9f, 0.35f, dark);
                 DrawCube({ -0.85f, -0.1f, 0.1f }, 0.35f, 0.9f, 0.35f, dark);
+                break;
+            }
+            case EnemyType::Warden: {
+                Color body = Mix({ 26, 12, 16, 255 }, WHITE, flash);
+                Color plate = Mix({ 120, 12, 20, 255 }, WHITE, flash);
+                Color gold = Mix({ 255, 220, 120, 255 }, WHITE, flash);
+                float lean = Clamp(Vector2Length({ e.vel.x, e.vel.z }) * 1.5f, 0.0f, 12.0f);
+                rlRotatef(lean, 1, 0, 0);
+                DrawCube({ 0, 0.1f, 0 }, 3.0f, 2.6f, 2.0f, body);
+                DrawCubeWires({ 0, 0.1f, 0 }, 3.0f, 2.6f, 2.0f, { 230, 30, 40, 255 });
+                DrawCube({ 0, 0.3f, 0.9f }, 2.2f, 1.4f, 0.3f, plate);      // chest plate
+                DrawCube({ 0, 1.8f, 0.2f }, 1.1f, 0.9f, 1.0f, plate);      // head
+                DrawCube({ 0, 1.8f, 0.75f }, 0.8f, 0.15f, 0.1f, gold);     // visor
+                DrawCylinder({ 0.7f, 2.2f, 0 }, 0.22f, 0.0f, 0.9f, 4, gold);  // crown
+                DrawCylinder({ -0.7f, 2.2f, 0 }, 0.22f, 0.0f, 0.9f, 4, gold);
+                DrawCylinder({ 0, 2.3f, -0.3f }, 0.22f, 0.0f, 1.1f, 4, gold);
+                DrawCube({ 1.8f, -0.2f, 0.2f }, 0.7f, 2.0f, 0.7f, body);   // arms
+                DrawCube({ -1.8f, -0.2f, 0.2f }, 0.7f, 2.0f, 0.7f, body);
+                DrawCubeWires({ 1.8f, -0.2f, 0.2f }, 0.7f, 2.0f, 0.7f, { 230, 30, 40, 255 });
+                DrawCubeWires({ -1.8f, -0.2f, 0.2f }, 0.7f, 2.0f, 0.7f, { 230, 30, 40, 255 });
                 break;
             }
         }
         rlPopMatrix();
     }
 
-    // enemy projectiles: glowing destructible orbs
     for (const EnemyShot& s : shots_) {
         if (!s.alive) continue;
         DrawSphere(s.pos, SHOT_RADIUS, { 255, 230, 0, 255 });

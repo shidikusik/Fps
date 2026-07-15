@@ -174,6 +174,29 @@ Sound GenWaveHorn() {
     return Build(s);
 }
 
+Sound GenNail() {
+    auto s = Buf(0.06f);
+    for (size_t i = 0; i < s.size(); i++) {
+        float t = (float)i / SAMPLE_RATE;
+        s[i] = Rnd2() * expf(-t * 90) * 0.6f + sinf(PI2 * 480 * t) * expf(-t * 70) * 0.5f;
+    }
+    return Build(s);
+}
+
+Sound GenRail() {
+    auto s = Buf(0.55f);
+    for (size_t i = 0; i < s.size(); i++) {
+        float t = (float)i / SAMPLE_RATE;
+        float f = 1400 - 2400 * t;
+        if (f < 90) f = 90;
+        float zap = sinf(PI2 * f * t) * expf(-t * 6);
+        float sub = sinf(PI2 * 52 * t) * expf(-t * 5);
+        float crack = Rnd2() * expf(-t * 35) * 0.8f;
+        s[i] = zap * 0.7f + sub * 0.8f + crack;
+    }
+    return Build(s);
+}
+
 Sound GenClick() {
     auto s = Buf(0.06f);
     for (size_t i = 0; i < s.size(); i++) {
@@ -203,6 +226,8 @@ void Init() {
     base[ENEMY_SHOOT] = GenEnemyShoot();
     base[WAVE] = GenWaveHorn();
     base[CLICK] = GenClick();
+    base[NAIL] = GenNail();
+    base[RAIL] = GenRail();
 
     for (int i = 0; i < COUNT; i++) {
         sounds[i][0] = base[i];

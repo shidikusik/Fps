@@ -5,8 +5,8 @@
 namespace cfg {
 
 // --- render ---
-inline constexpr int   RENDER_W = 854;   // internal low-res target (480p)
-inline constexpr int   RENDER_H = 480;
+inline constexpr int   RENDER_W = 1280;  // internal render target (720p, crisp
+inline constexpr int   RENDER_H = 720;   // point-filtered upscale keeps the style)
 inline constexpr float BASE_FOV = 95.0f;
 inline constexpr float MAX_FOV_KICK = 12.0f;   // extra FOV at high speed
 
