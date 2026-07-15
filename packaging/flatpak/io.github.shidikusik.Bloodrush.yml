@@ -24,7 +24,7 @@ modules:
     sources:
       - type: archive
         url: https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
-        sha256: 797b23b1a4b7cbba3ffd7d4bca663200fed9362630d0aa340e8480a3ba8f8052
+        sha256: aea98ecf5bc5c5e0b789a76de0083a21a70457050ea4cc2aec7566935f5e258e
 
   - name: bloodrush
     buildsystem: cmake-ninja
