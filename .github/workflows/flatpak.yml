@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build .flatpak bundle
-        uses: flathub-infra/flatpak-github-actions/flatpak-builder@v6
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: bloodrush.flatpak
           manifest-path: packaging/flatpak/io.github.shidikusik.Bloodrush.yml
