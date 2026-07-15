@@ -33,11 +33,22 @@ public:
     float   dashCharges = (float)3; // fractional while recharging
     float   trauma = 0;             // 0..1 screenshake energy
 
+    // combat
+    float   hp = 100, maxHp = 100;
+    float   hurtFlash = 0;          // 0..1, drives red vignette
+    float   healFlash = 0;
+    float   timeSinceDash = 99;     // for DASHKILL detection
+    bool    slamLandedThisFrame = false; // slam AoE trigger
+
     float HorizontalSpeed() const;
     Vector3 Forward() const;        // full look direction
     Vector3 FlatForward() const;    // yaw only, y=0
+    Vector3 EyePos() const;
 
     void AddTrauma(float t);
+    bool TakeDamage(float dmg);     // false if blocked by i-frames
+    void Heal(float amount);
+    bool Dead() const { return hp <= 0; }
 
 private:
     void Accelerate(Vector3 wishdir, float wishspeed, float accel, float dt);
@@ -55,5 +66,6 @@ private:
     Vector3 dashDir_{};
     Vector3 slideDir_{};
     float slamLandTimer_ = 0;       // window for boosted post-slam jump
+    float hurtCd_ = 0;              // i-frames
     float fovKick_ = 0;
 };

@@ -41,6 +41,11 @@ add_executable(bloodrush
     src/main.cpp
     src/player.cpp
     src/arena.cpp
+    src/enemies.cpp
+    src/weapons.cpp
+    src/particles.cpp
+    src/style_meter.cpp
+    src/sounds.cpp
 )
 
 target_link_libraries(bloodrush PRIVATE raylib)

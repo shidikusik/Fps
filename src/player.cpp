@@ -1,6 +1,7 @@
 #include "player.h"
 #include "arena.h"
 #include "config.h"
+#include "sounds.h"
 #include "raymath.h"
 
 #include <algorithm>
@@ -20,6 +21,32 @@ void Player::Init(Vector3 spawn) {
     height_ = PLAYER_HEIGHT;
     trauma = 0;
     jumpBuffer_ = coyote_ = dashTimeLeft_ = slamLandTimer_ = 0;
+    hp = maxHp;
+    hurtFlash = healFlash = 0;
+    hurtCd_ = 0;
+    timeSinceDash = 99;
+    slamLandedThisFrame = false;
+}
+
+Vector3 Player::EyePos() const {
+    return { pos.x, pos.y + height_ - EYE_OFFSET, pos.z };
+}
+
+bool Player::TakeDamage(float dmg) {
+    if (hurtCd_ > 0 || hp <= 0) return false;
+    hp -= dmg;
+    hurtCd_ = 0.45f;
+    hurtFlash = 1.0f;
+    AddTrauma(0.3f);
+    sfx::Play(sfx::HURT);
+    return true;
+}
+
+void Player::Heal(float amount) {
+    if (hp <= 0 || hp >= maxHp) return;
+    hp = std::min(maxHp, hp + amount);
+    healFlash = 1.0f;
+    sfx::Play(sfx::HEAL, 0.5f);
 }
 
 Vector3 Player::Forward() const {
@@ -67,7 +94,9 @@ void Player::StartDash(Vector3 dir) {
     dashTimeLeft_ = DASH_TIME;
     dashDir_ = dir;
     dashCharges -= 1.0f;
+    timeSinceDash = 0;
     AddTrauma(0.15f);
+    sfx::Play(sfx::DASH, 0.7f);
 }
 
 void Player::StartSlide() {
@@ -94,6 +123,11 @@ void Player::Update(const PlayerInput& in, const Arena& arena, float dt) {
 
     // --- timers ---
     trauma = std::max(0.0f, trauma - dt * 2.2f);
+    hurtFlash = std::max(0.0f, hurtFlash - dt * 2.5f);
+    healFlash = std::max(0.0f, healFlash - dt * 3.0f);
+    hurtCd_ = std::max(0.0f, hurtCd_ - dt);
+    timeSinceDash += dt;
+    slamLandedThisFrame = false;
     slamLandTimer_ = std::max(0.0f, slamLandTimer_ - dt);
     coyote_ = grounded ? COYOTE_TIME : std::max(0.0f, coyote_ - dt);
     if (dashCharges < (float)DASH_CHARGES)
@@ -196,7 +230,9 @@ void Player::Update(const PlayerInput& in, const Arena& arena, float dt) {
         if (slamming) {
             slamming = false;
             slamLandTimer_ = SLAM_JUMP_WINDOW;
+            slamLandedThisFrame = true;
             AddTrauma(0.45f);
+            sfx::Play(sfx::SLAM);
         }
     }
 
