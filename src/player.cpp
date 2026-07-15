@@ -13,7 +13,7 @@ void Player::Init(Vector3 spawn) {
     spawn_ = spawn;
     pos = spawn;
     vel = { 0, 0, 0 };
-    yaw = 180.0f; // face the tower
+    yaw = 0.0f; // spawn at +Z looking toward the central tower (-Z)
     pitch = 0;
     grounded = false;
     sliding = dashing = slamming = false;

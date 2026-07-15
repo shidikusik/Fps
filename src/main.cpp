@@ -11,12 +11,14 @@
 #include "enemies.h"
 #include "particles.h"
 #include "player.h"
+#include "shading.h"
 #include "sounds.h"
 #include "style_meter.h"
 #include "weapons.h"
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 namespace {
 
@@ -125,7 +127,7 @@ void DrawMenu() {
     DrawCenteredText("BLOODRUSH", H / 2 - 130, 70, HUD_RED);
     DrawCenteredText("MANKIND IS DEAD. BLOOD IS FUEL.", H / 2 - 55, 16, HUD_DIM);
     if (fmodf((float)GetTime() * 1.6f, 1.0f) > 0.35f)
-        DrawCenteredText("CLICK TO START", H / 2, 26, HUD_YELLOW);
+        DrawCenteredText("CLICK OR ENTER TO START", H / 2, 26, HUD_YELLOW);
 
     const char* lines[] = {
         "WASD + mouse  move    SPACE hold  bunny hop",
@@ -167,6 +169,7 @@ int main() {
 
     RenderTexture2D target = LoadRenderTexture(cfg::RENDER_W, cfg::RENDER_H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
+    Shader shading = LoadShadingShader();
 
     Arena arena;
     arena.Init();
@@ -188,6 +191,8 @@ int main() {
     GameState state = GameState::Menu;
     float shakeTime = 0;
     bool quit = false;
+    // dev/CI hook: aim at the nearest enemy automatically
+    const bool autoAim = getenv("BLOODRUSH_AUTOTEST") != nullptr;
 
     while (!WindowShouldClose() && !quit) {
         float dt = fminf(GetFrameTime(), cfg::MAX_DT);
@@ -195,7 +200,7 @@ int main() {
 
         switch (state) {
             case GameState::Menu:
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER)) {
                     resetRun();
                     state = GameState::Playing;
                     DisableCursor();
@@ -212,6 +217,20 @@ int main() {
                 }
                 PlayerInput in = GatherInput();
                 player.Update(in, arena, dt);
+                if (autoAim) {
+                    float best = 1e9f;
+                    Vector3 eye = player.EyePos();
+                    for (Enemy& e : enemies.All()) {
+                        if (!e.alive || e.spawnT < 1) continue;
+                        Vector3 d = Vector3Subtract(e.Center(), eye);
+                        float len = Vector3Length(d);
+                        if (len < best) {
+                            best = len;
+                            player.yaw = RAD2DEG * atan2f(d.x, -d.z);
+                            player.pitch = RAD2DEG * asinf(d.y / len);
+                        }
+                    }
+                }
                 weapons.Update(player, arena, enemies, particles, style, dt);
                 enemies.Update(player, arena, particles, style, dt);
                 particles.Update(dt);
@@ -226,7 +245,8 @@ int main() {
             }
 
             case GameState::Paused:
-                if (IsKeyPressed(KEY_ESCAPE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_ENTER) ||
+                    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     state = GameState::Playing;
                     DisableCursor();
                 }
@@ -235,7 +255,7 @@ int main() {
 
             case GameState::Dead:
                 particles.Update(dt); // let the gore settle behind the overlay
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER)) {
                     resetRun();
                     state = GameState::Playing;
                     DisableCursor();
@@ -266,20 +286,24 @@ int main() {
         BeginTextureMode(target);
         ClearBackground({ 8, 4, 6, 255 });
         BeginMode3D(cam);
+        BeginShaderMode(shading);
         arena.Draw();
         enemies.Draw();
         weapons.Draw3D();
         particles.Draw();
+        EndShaderMode();
         EndMode3D();
 
         if (state != GameState::Menu) {
             // viewmodel pass: depth test off so the gun never clips into walls
             BeginMode3D(cam);
+            BeginShaderMode(shading);
             rlDrawRenderBatchActive();
             rlDisableDepthTest();
             weapons.DrawViewmodel(player);
             rlDrawRenderBatchActive();
             rlEnableDepthTest();
+            EndShaderMode();
             EndMode3D();
 
             // damage / heal vignette
@@ -310,6 +334,7 @@ int main() {
         EndDrawing();
     }
 
+    UnloadShader(shading);
     UnloadRenderTexture(target);
     sfx::Shutdown();
     CloseWindow();

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=BLOODRUSH
+Comment=Fast-paced retro arena FPS where blood is fuel
+Comment[ru]=Безумный ретро арена-шутер, где кровь — топливо
+Exec=bloodrush
+Icon=io.github.shidikusik.Bloodrush
+Terminal=false
+Type=Application
+Categories=Game;ActionGame;
+Keywords=fps;shooter;arena;retro;movement;
+StartupWMClass=BLOODRUSH

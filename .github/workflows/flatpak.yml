@@ -1,0 +1,22 @@
+name: Flatpak
+
+on:
+  push:
+    branches: [claude/bloodrush-fps-game-01wbax]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  flatpak:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build .flatpak bundle
+        uses: flathub-infra/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: bloodrush.flatpak
+          manifest-path: packaging/flatpak/io.github.shidikusik.Bloodrush.yml
+          cache-key: flatpak-builder-${{ github.sha }}

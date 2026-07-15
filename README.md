@@ -5,6 +5,22 @@ C++20 + raylib, ретро low-poly, пиксельный рендер в 480p.
 Бесконечные волны врагов, bunny hop, dash, slide, ground slam,
 стайл-метр и лечение кровью. Работает на X11 и Wayland.
 
+![gameplay](docs/screenshots/combat.png)
+
+## Установка как приложение (Flatpak)
+
+Готовый бандл собирается CI на каждый пуш: вкладка
+[**Actions**](https://github.com/shidikusik/Fps/actions) → последний запуск
+**Flatpak** → артефакт `bloodrush.flatpak`, затем:
+
+```sh
+flatpak install --user bloodrush.flatpak
+flatpak run io.github.shidikusik.Bloodrush
+```
+
+Локальная сборка Flatpak и инструкция по публикации на Flathub —
+в [packaging/flatpak/](packaging/flatpak/).
+
 ## Установка на любом дистрибутиве Linux
 
 Нужны только: **компилятор C++ (GCC/Clang), CMake ≥ 3.16 и git**.

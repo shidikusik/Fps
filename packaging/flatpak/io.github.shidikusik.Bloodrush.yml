@@ -1,0 +1,36 @@
+app-id: io.github.shidikusik.Bloodrush
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: bloodrush
+
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --socket=pulseaudio
+
+modules:
+  # Flathub builds run offline, so raylib is a pinned module instead of
+  # the CMake FetchContent fallback.
+  - name: raylib
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_EXAMPLES=OFF
+      - -DGLFW_BUILD_WAYLAND=ON
+      - -DGLFW_BUILD_X11=ON
+    sources:
+      - type: archive
+        url: https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
+        sha256: 797b23b1a4b7cbba3ffd7d4bca663200fed9362630d0aa340e8480a3ba8f8052
+
+  - name: bloodrush
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: git
+        url: https://github.com/shidikusik/Fps.git
+        tag: v0.1.0

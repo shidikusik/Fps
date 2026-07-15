@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.shidikusik.Bloodrush</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>BLOODRUSH</name>
+  <summary>Fast-paced retro arena FPS where blood is fuel</summary>
+  <developer id="io.github.shidikusik">
+    <name>shidikusik</name>
+  </developer>
+  <description>
+    <p>
+      BLOODRUSH is a frantic first-person arena shooter inspired by classic
+      movement shooters. Health never regenerates on its own — the only way
+      to heal is to deal damage up close. Keep moving or die.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Movement-first gameplay: bunny hopping, dashing, sliding and ground slams</li>
+      <li>Two weapons: a hitscan revolver with a charged piercing alt-fire and a projectile shotgun</li>
+      <li>Three enemy types, including one whose projectiles you can shoot out of the air</li>
+      <li>Endless waves of increasing difficulty with a score counter</li>
+      <li>A style meter ranking you from D up to ULTRAVIOLENT</li>
+      <li>Retro low-poly look rendered at 480p and upscaled with crunchy pixels</li>
+      <li>Fully procedural sound effects — no asset files at all</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.shidikusik.Bloodrush.desktop</launchable>
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">moderate</content_attribute>
+    <content_attribute id="violence-bloodshed">moderate</content_attribute>
+  </content_rating>
+  <url type="homepage">https://github.com/shidikusik/Fps</url>
+  <url type="bugtracker">https://github.com/shidikusik/Fps/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Blasting husks with the shotgun in the arena</caption>
+      <image>https://raw.githubusercontent.com/shidikusik/Fps/claude/bloodrush-fps-game-01wbax/docs/screenshots/combat.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The arena from the spawn platform</caption>
+      <image>https://raw.githubusercontent.com/shidikusik/Fps/claude/bloodrush-fps-game-01wbax/docs/screenshots/arena.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Main menu</caption>
+      <image>https://raw.githubusercontent.com/shidikusik/Fps/claude/bloodrush-fps-game-01wbax/docs/screenshots/menu.png</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>Game</category>
+    <category>ActionGame</category>
+  </categories>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <releases>
+    <release version="0.1.0" date="2026-07-15">
+      <description>
+        <p>First release: movement core, two weapons, three enemy types,
+        endless waves, style meter, blood healing, procedural audio.</p>
+      </description>
+    </release>
+  </releases>
+</component>

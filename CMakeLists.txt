@@ -53,3 +53,13 @@ target_link_libraries(bloodrush PRIVATE raylib)
 if(UNIX AND NOT APPLE)
     target_link_libraries(bloodrush PRIVATE m)
 endif()
+
+# Desktop integration (used by the Flatpak; harmless for local builds)
+include(GNUInstallDirs)
+install(TARGETS bloodrush RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES data/io.github.shidikusik.Bloodrush.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES data/io.github.shidikusik.Bloodrush.metainfo.xml
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+install(FILES data/io.github.shidikusik.Bloodrush.svg
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)

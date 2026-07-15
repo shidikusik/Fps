@@ -24,8 +24,8 @@ constexpr float SHOTGUN_CD = 0.75f, PELLET_HEAL = 3, PELLET_RADIUS = 0.14f;
 constexpr float HEAL_RANGE = 10.0f;     // blood heals only up close
 constexpr float PARRY_POINTS = 25;
 
-constexpr Color GUN_DARK   = { 38, 34, 38, 255 };
-constexpr Color GUN_BLACK  = { 16, 12, 14, 255 };
+constexpr Color GUN_DARK   = { 82, 76, 84, 255 };
+constexpr Color GUN_BLACK  = { 36, 30, 34, 255 };
 constexpr Color GUN_RED    = { 150, 18, 26, 255 };
 constexpr Color GUN_YELLOW = { 255, 230, 0, 255 };
 
