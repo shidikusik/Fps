@@ -1,31 +1,46 @@
 # BLOODRUSH
 
+[![Flatpak](https://github.com/shidikusik/Fps/actions/workflows/flatpak.yml/badge.svg)](https://github.com/shidikusik/Fps/actions/workflows/flatpak.yml)
+
 Безумный fast-paced арена-шутер от первого лица в духе ULTRAKILL.
-C++20 + raylib, ретро low-poly, рендер 720p с пиксельным апскейлом.
+C++20 + raylib, ретро low-poly, рендер 720p с пиксельным апскейлом,
+полностью процедурный звук — ни одного файла ассетов.
 Bunny hop, dash, slide, ground slam, стайл-метр и лечение кровью.
 **3 уровня, сюжетные катсцены, 4 оружия, босс THE WARDEN и бесконечный
 NG+ цикл после победы.** Работает на X11 и Wayland.
 
+![gameplay](docs/screenshots/combat.png)
+
+| ![arena](docs/screenshots/arena.png) | ![cutscene](docs/screenshots/cutscene.png) |
+|---|---|
+| THE YARD, первая волна | вступительная катсцена |
+
 ## Сюжет
 
 Земля мертва. Боевая машина V-13 просыпается с пустыми баками —
-и находит альтернативное топливо: кровь. Башня зовёт вниз:
-**THE YARD → THE CATACOMBS → THE ALTAR**, где ждёт Хранитель.
-Убей его — и башня предложит только одно: глубже. LOOP 2. LOOP 3...
+и находит альтернативное топливо: кровь. Башня зовёт вниз, слой за слоем:
 
-![gameplay](docs/screenshots/combat.png)
+1. **THE YARD** — открытый двор со ступенчатой башней.
+2. **THE CATACOMBS** — лабиринт колонн и надземных мостиков.
+3. **THE ALTAR** — вертикальный шпиль, на вершине которого ждёт
+   **THE WARDEN**.
+
+Каждый слой — 4 волны, третий заканчивается боссом. Убей Хранителя —
+и башня предложит только одно: глубже. LOOP 2. LOOP 3...
 
 ## Установка как приложение (Flatpak)
 
 Готовый бандл собирается CI на каждый пуш: вкладка
-[**Actions**](https://github.com/shidikusik/Fps/actions) → последний запуск
-**Flatpak** → артефакт `bloodrush.flatpak`, затем:
+[**Actions**](https://github.com/shidikusik/Fps/actions) → последний
+зелёный запуск **Flatpak** → артефакт `bloodrush-x86_64.flatpak`
+(скачается zip-архивом — распакуйте), затем:
 
 ```sh
-flatpak install --user bloodrush.flatpak
+flatpak install --user bloodrush-x86_64.flatpak
 flatpak run io.github.shidikusik.Bloodrush
 ```
 
+Игра появится в меню приложений с иконкой, как обычное приложение.
 Локальная сборка Flatpak и инструкция по публикации на Flathub —
 в [packaging/flatpak/](packaging/flatpak/).
 
@@ -79,8 +94,8 @@ sudo emerge --ask dev-build/cmake media-libs/raylib
 ### 2. Сборка и запуск
 
 ```sh
-git clone --branch claude/bloodrush-fps-game-01wbax https://github.com/shidikusik/fps.git
-cd fps
+git clone https://github.com/shidikusik/Fps.git
+cd Fps
 mkdir build && cd build
 cmake ..
 make -j$(nproc)
@@ -89,6 +104,15 @@ make -j$(nproc)
 
 Если raylib есть в системе — сборка займёт секунды. Если нет — CMake
 скачает raylib 5.5 и соберёт его один раз (пара минут).
+
+### 3. (Необязательно) иконка в меню приложений
+
+```sh
+sudo make install
+```
+
+Установит бинарник, `.desktop`-файл и иконку — игра появится в меню
+приложений без всякого Flatpak.
 
 ### Возможные проблемы
 
@@ -153,3 +177,25 @@ D → C → B → A → S → ULTRAVIOLENT; растёт от убийств, р
 - **Slam storage**: прыжок в течение 0.25с после slam — усиленный прыжок.
 
 Скорость всегда показана на HUD слева внизу (UPS = units per second).
+
+## Структура кода
+
+| Модуль | Что делает |
+|---|---|
+| `src/player.*` | квейковская физика: bhop, dash, slide, slam, здоровье |
+| `src/weapons.*` | 4 оружия, hitscan/проджектайлы, viewmodel из примитивов |
+| `src/enemies.*` | 4 типа врагов, волны, уровни, босс, NG+ |
+| `src/arena.*` | 3 арены из AABB-блоков, спавн-пады |
+| `src/style_meter.*` | ранги D→ULTRAVIOLENT, попапы, счёт |
+| `src/particles.*` | кровь-кубики и искры с физикой |
+| `src/cutscene.*` | letterbox-катсцены с typewriter-текстом |
+| `src/sounds.*` | процедурная генерация всех звуков при старте |
+| `src/shading.h` | направленный свет + туман глубины (GLSL) |
+| `src/config.h` | все константы движения и рендера в одном месте |
+
+Тюнинг баланса: урон и кулдауны — в шапке `weapons.cpp`, здоровье и
+скорости врагов — в шапке `enemies.cpp`, движение — в `config.h`.
+
+## Лицензия
+
+MIT — см. [LICENSE](LICENSE).
