@@ -19,6 +19,8 @@ set(BLOODRUSH_SOURCES
     src/sounds.cpp
     src/cutscene.cpp
     src/touch.cpp
+    src/ui.cpp
+    src/localization.cpp
 )
 
 # --- raylib: system package when available, otherwise fetch and build ---

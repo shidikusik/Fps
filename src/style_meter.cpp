@@ -1,5 +1,6 @@
 #include "style_meter.h"
 #include "config.h"
+#include "ui.h"
 #include "raylib.h"
 
 #include <algorithm>
@@ -68,13 +69,13 @@ void StyleMeter::Draw() const {
     if (rank == NUM_RANKS - 1 && fmodf((float)GetTime() * 6.0f, 1.0f) > 0.5f)
         col = { 255, 230, 0, 255 };
 
-    // rank letter / word
+    // rank letter / word (right-aligned: the pixel font is wide)
     const char* name = RANKS[rank].name;
     if (rank == NUM_RANKS - 1) {
-        DrawText("ULTRA", W - 120, H / 2 - 92, 30, col);
-        DrawText("VIOLENT", W - 120, H / 2 - 62, 30, col);
+        ui::Text("ULTRA", W - 36 - ui::Measure("ULTRA", 22), H / 2 - 88, 22, col);
+        ui::Text("VIOLENT", W - 36 - ui::Measure("VIOLENT", 22), H / 2 - 62, 22, col);
     } else {
-        DrawText(name, W - 96, H / 2 - 110, 80, col);
+        ui::Text(name, W - 36 - ui::Measure(name, 80), H / 2 - 110, 80, col);
     }
 
     // vertical progress bar toward next rank
@@ -93,6 +94,7 @@ void StyleMeter::Draw() const {
         unsigned char alpha = (unsigned char)(255 * (a > 1 ? 1 : a));
         Color pc = { 255, 230, 0, alpha };
         if (i == 0) pc = { 235, 230, 230, alpha };
-        DrawText(popups_[i].text.c_str(), W - 130, H / 2 + 10 + (int)i * 20, 16, pc);
+        const char* t = popups_[i].text.c_str();
+        ui::Text(t, W - 36 - ui::Measure(t, 14), H / 2 + 10 + (int)i * 20, 14, pc);
     }
 }

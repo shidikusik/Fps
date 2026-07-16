@@ -1,5 +1,7 @@
 #include "touch.h"
 #include "config.h"
+#include "localization.h"
+#include "ui.h"
 #include "raymath.h"
 
 #include <algorithm>
@@ -16,13 +18,13 @@ constexpr Color UI_HOT = { 255, 230, 0, 160 };
 
 TouchControls::TouchControls() {
     const float W = (float)cfg::RENDER_W, H = (float)cfg::RENDER_H;
-    btns_[BTN_FIRE]   = { { W - 110, H - 150 }, 72, "FIRE" };
-    btns_[BTN_ALT]    = { { W - 260, H - 80 },  46, "ALT" };
-    btns_[BTN_JUMP]   = { { W - 100, H - 325 }, 56, "JUMP" };
-    btns_[BTN_DASH]   = { { W - 240, H - 240 }, 46, "DASH" };
-    btns_[BTN_CROUCH] = { { W - 375, H - 135 }, 46, "CRCH" };
-    btns_[BTN_WPN]    = { { W - 70,  H - 475 }, 42, "WPN" };
-    btns_[BTN_PAUSE]  = { { 45, 45 },           32, "II" };
+    btns_[BTN_FIRE]   = { { W - 110, H - 150 }, 72, "FIRE", "ОГОНЬ" };
+    btns_[BTN_ALT]    = { { W - 260, H - 80 },  46, "ALT", "АЛЬТ" };
+    btns_[BTN_JUMP]   = { { W - 100, H - 325 }, 56, "JUMP", "ПРЫГ" };
+    btns_[BTN_DASH]   = { { W - 240, H - 240 }, 46, "DASH", "РЫВОК" };
+    btns_[BTN_CROUCH] = { { W - 375, H - 135 }, 46, "CRCH", "ПРИС" };
+    btns_[BTN_WPN]    = { { W - 70,  H - 475 }, 42, "WPN", "ОРУЖ" };
+    btns_[BTN_PAUSE]  = { { 45, 45 },           32, "II", "II" };
 }
 
 int TouchControls::FindButton(Vector2 p) const {
@@ -130,17 +132,19 @@ void TouchControls::Draw() const {
         DrawCircle((int)nub.x, (int)nub.y, 26, UI_DIM);
         DrawCircleLines((int)nub.x, (int)nub.y, 26, UI_HOT);
     } else {
+        const char* mv = loc::T("MOVE", "ХОД");
         DrawCircleLines(180, cfg::RENDER_H - 170, 40, UI_DIM);
-        DrawText("MOVE", 180 - MeasureText("MOVE", 14) / 2,
-                 cfg::RENDER_H - 170 - 7, 14, UI_DIM);
+        ui::Text(mv, 180 - ui::Measure(mv, 12) / 2,
+                 cfg::RENDER_H - 170 - 6, 12, UI_DIM);
     }
 
     for (const Btn& b : btns_) {
         Color line = b.held ? UI_HOT : UI_LINE;
         DrawCircle((int)b.pos.x, (int)b.pos.y, b.r, Fade(BLACK, 0.25f));
         DrawCircleLines((int)b.pos.x, (int)b.pos.y, b.r, line);
-        int fs = b.r >= 55 ? 18 : 14;
-        DrawText(b.label, (int)b.pos.x - MeasureText(b.label, fs) / 2,
+        const char* label = loc::T(b.labelEn, b.labelRu);
+        int fs = b.r >= 55 ? 14 : 11;
+        ui::Text(label, (int)b.pos.x - ui::Measure(label, fs) / 2,
                  (int)b.pos.y - fs / 2, fs, line);
     }
 }

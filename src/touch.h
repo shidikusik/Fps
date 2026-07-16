@@ -29,7 +29,8 @@ private:
     enum BtnId { BTN_FIRE, BTN_ALT, BTN_JUMP, BTN_DASH, BTN_CROUCH,
                  BTN_WPN, BTN_PAUSE, BTN_COUNT };
     struct Btn {
-        Vector2 pos; float r; const char* label;
+        Vector2 pos; float r;
+        const char* labelEn; const char* labelRu;
         bool held = false, pressed = false;
     };
     enum Kind { KIND_STICK, KIND_LOOK, KIND_BTN };

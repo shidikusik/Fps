@@ -1,6 +1,8 @@
 #include "cutscene.h"
 #include "config.h"
+#include "localization.h"
 #include "sounds.h"
+#include "ui.h"
 #include "raylib.h"
 
 #include <cmath>
@@ -57,17 +59,20 @@ void Cutscene::Draw() const {
     DrawRectangle(0, 0, W, bar, BLACK);
     DrawRectangle(0, H - bar, W, bar, BLACK);
 
-    // current line, typewriter-clipped
+    // current line, typewriter-clipped (never split a UTF-8 sequence)
     const std::string& cur = lines_[line_];
     int n = (int)chars_;
     if (n > (int)cur.size()) n = (int)cur.size();
+    while (n > 0 && n < (int)cur.size() &&
+           ((unsigned char)cur[n] & 0xC0) == 0x80)
+        n--;
     std::string shown = cur.substr(0, n);
 
     bool lastLine = line_ + 1 == lines_.size();
     Color col = lastLine ? Color{ 230, 30, 40, 255 } : Color{ 235, 230, 230, 255 };
-    int size = 34;
-    int w = MeasureText(cur.c_str(), size); // measure the full line: no wobble
-    DrawText(shown.c_str(), W / 2 - w / 2, H / 2 - size / 2, size, col);
+    int size = 26;
+    int w = ui::Measure(cur.c_str(), size); // measure the full line: no wobble
+    ui::Text(shown.c_str(), W / 2 - w / 2, H / 2 - size / 2, size, col);
 
     // progress dots
     for (size_t i = 0; i < lines_.size(); i++) {
@@ -75,6 +80,6 @@ void Cutscene::Draw() const {
         DrawRectangle(W / 2 - (int)lines_.size() * 8 + (int)i * 16, H - bar / 2, 8, 8, dc);
     }
 
-    const char* hint = "CLICK / ENTER — SKIP";
-    DrawText(hint, W - MeasureText(hint, 16) - 18, bar / 2 - 8, 16, { 120, 60, 64, 255 });
+    const char* hint = loc::T("CLICK / ENTER — SKIP", "КЛИК / ENTER — ПРОПУСТИТЬ");
+    ui::Text(hint, W - ui::Measure(hint, 14) - 18, bar / 2 - 7, 14, { 120, 60, 64, 255 });
 }

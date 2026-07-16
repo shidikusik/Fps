@@ -150,8 +150,14 @@ app menu without any Flatpak.
 | RMB (hold) | revolver charged shot — pierces everything |
 | 1–4 / wheel | switch weapons |
 | ENTER / click | start, skip cutscenes, retry |
+| L (in menu) | language: English / Русский (also a clickable button) |
 | ESC | pause |
 | F11 | fullscreen |
+
+The language choice covers the menu, HUD, cutscenes and touch labels
+(style popups and rank names stay English by design) and persists in
+`~/.config/bloodrush.lang`. Cyrillic is rendered by an embedded
+Press Start 2P pixel font (OFL) — still zero asset files.
 
 On Android everything maps to the touch UI; on desktop you can preview it
 with `BLOODRUSH_TOUCH=1 ./bloodrush`.

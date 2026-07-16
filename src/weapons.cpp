@@ -6,6 +6,7 @@
 #include "player.h"
 #include "sounds.h"
 #include "style_meter.h"
+#include "ui.h"
 #include "raymath.h"
 #include "rlgl.h"
 
@@ -484,7 +485,7 @@ void Weapons::DrawHUD() const {
     const int W = cfg::RENDER_W, H = cfg::RENDER_H;
 
     const char* name = WeaponName(current);
-    DrawText(name, W - MeasureText(name, 20) - 16, H - 40, 20, { 235, 230, 230, 255 });
+    ui::Text(name, W - ui::Measure(name, 16) - 16, H - 40, 16, { 235, 230, 230, 255 });
     if (cd_ > 0)
         DrawRectangle(W - 116, H - 16, (int)(100 * (1.0f - cd_ / cdMax_)), 4,
                       { 120, 60, 64, 255 });
