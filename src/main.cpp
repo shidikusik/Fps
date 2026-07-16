@@ -14,6 +14,7 @@
 #include "shading.h"
 #include "sounds.h"
 #include "style_meter.h"
+#include "touch.h"
 #include "weapons.h"
 
 #include <cmath>
@@ -80,6 +81,21 @@ PlayerInput GatherInput() {
     in.dashPressed  = IsKeyPressed(KEY_LEFT_SHIFT) || IsKeyPressed(KEY_RIGHT_SHIFT);
     in.crouchPressed= IsKeyPressed(KEY_LEFT_CONTROL) || IsKeyPressed(KEY_RIGHT_CONTROL);
     in.crouchHeld   = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+    return in;
+}
+
+CombatInput GatherCombatInput(const PlayerInput& pin) {
+    CombatInput in;
+    in.fireHeld = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    in.altHeld = IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
+    if (IsKeyPressed(KEY_ONE)) in.select = 0;
+    if (IsKeyPressed(KEY_TWO)) in.select = 1;
+    if (IsKeyPressed(KEY_THREE)) in.select = 2;
+    if (IsKeyPressed(KEY_FOUR)) in.select = 3;
+    float wheel = GetMouseWheelMove();
+    in.cycle = wheel > 0 ? 1 : (wheel < 0 ? -1 : 0);
+    in.lookDx = pin.mouseDx;
+    in.lookDy = pin.mouseDy;
     return in;
 }
 
@@ -275,10 +291,23 @@ int main() {
     float shakeTime = 0;
     bool quit = false;
     const bool autoAim = getenv("BLOODRUSH_AUTOTEST") != nullptr;
+#ifdef __ANDROID__
+    const bool touchUI = true;
+#else
+    const bool touchUI = getenv("BLOODRUSH_TOUCH") != nullptr;
+#endif
+    TouchControls touch;
 
     while (!WindowShouldClose() && !quit) {
         float dt = fminf(GetFrameTime(), cfg::MAX_DT);
         if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
+
+        // letterbox mapping for this frame (used by touch input + final blit)
+        RenderMap map;
+        map.scale = fminf((float)GetScreenWidth() / cfg::RENDER_W,
+                          (float)GetScreenHeight() / cfg::RENDER_H);
+        map.offX = (GetScreenWidth() - cfg::RENDER_W * map.scale) * 0.5f;
+        map.offY = (GetScreenHeight() - cfg::RENDER_H * map.scale) * 0.5f;
 
         switch (state) {
             case GameState::Menu:
@@ -304,12 +333,23 @@ int main() {
                 break;
 
             case GameState::Playing: {
-                if (IsKeyPressed(KEY_ESCAPE)) {
+                PlayerInput in;
+                CombatInput cin;
+                bool pausePressed = IsKeyPressed(KEY_ESCAPE) ||
+                                    IsKeyPressed(KEY_BACK);
+                if (touchUI) {
+                    bool touchPause = false;
+                    touch.Gather(map, in, cin, touchPause);
+                    pausePressed = pausePressed || touchPause;
+                } else {
+                    in = GatherInput();
+                    cin = GatherCombatInput(in);
+                }
+                if (pausePressed) {
                     state = GameState::Paused;
                     EnableCursor();
                     break;
                 }
-                PlayerInput in = GatherInput();
                 player.Update(in, arena, dt);
                 if (autoAim) {
                     float best = 1e9f;
@@ -325,7 +365,7 @@ int main() {
                         }
                     }
                 }
-                weapons.Update(player, arena, enemies, particles, style, dt);
+                weapons.Update(player, arena, enemies, particles, style, cin, dt);
                 enemies.Update(player, arena, particles, style, dt);
                 particles.Update(dt);
                 style.Update(dt);
@@ -435,6 +475,7 @@ int main() {
             DrawGameHud(player, enemies, style, arena);
             style.Draw();
             weapons.DrawHUD();
+            if (touchUI && state == GameState::Playing) touch.Draw();
         }
 
         if (state == GameState::Menu) DrawMenu();
@@ -446,12 +487,9 @@ int main() {
         // --- upscale to the window ---
         BeginDrawing();
         ClearBackground(BLACK);
-        float scale = fminf((float)GetScreenWidth() / cfg::RENDER_W,
-                            (float)GetScreenHeight() / cfg::RENDER_H);
-        float outW = cfg::RENDER_W * scale, outH = cfg::RENDER_H * scale;
         Rectangle src = { 0, 0, (float)cfg::RENDER_W, -(float)cfg::RENDER_H };
-        Rectangle dst = { (GetScreenWidth() - outW) * 0.5f,
-                          (GetScreenHeight() - outH) * 0.5f, outW, outH };
+        Rectangle dst = { map.offX, map.offY,
+                          cfg::RENDER_W * map.scale, cfg::RENDER_H * map.scale };
         DrawTexturePro(target.texture, src, dst, { 0, 0 }, 0, WHITE);
         EndDrawing();
     }

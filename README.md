@@ -1,56 +1,64 @@
 # BLOODRUSH
 
 [![Flatpak](https://github.com/shidikusik/Fps/actions/workflows/flatpak.yml/badge.svg)](https://github.com/shidikusik/Fps/actions/workflows/flatpak.yml)
+[![Builds](https://github.com/shidikusik/Fps/actions/workflows/builds.yml/badge.svg)](https://github.com/shidikusik/Fps/actions/workflows/builds.yml)
 
-Безумный fast-paced арена-шутер от первого лица в духе ULTRAKILL.
-C++20 + raylib, ретро low-poly, рендер 720p с пиксельным апскейлом,
-полностью процедурный звук — ни одного файла ассетов.
-Bunny hop, dash, slide, ground slam, стайл-метр и лечение кровью.
-**3 уровня, сюжетные катсцены, 4 оружия, босс THE WARDEN и бесконечный
-NG+ цикл после победы.** Работает на X11 и Wayland.
+**English | [Русский](README.ru.md)**
+
+A frantic fast-paced first-person arena shooter in the spirit of ULTRAKILL.
+C++20 + raylib, retro low-poly, 720p render with pixel upscale, fully
+procedural sound — not a single asset file. Bunny hop, dash, slide, ground
+slam, a style meter and blood healing. **3 levels, story cutscenes,
+4 weapons, THE WARDEN boss and an endless NG+ loop after victory.**
+
+Runs on **Linux** (X11 & Wayland), **Windows** and **Android**.
 
 ![gameplay](docs/screenshots/combat.png)
 
 | ![arena](docs/screenshots/arena.png) | ![cutscene](docs/screenshots/cutscene.png) |
 |---|---|
-| THE YARD, первая волна | вступительная катсцена |
+| THE YARD, wave one | intro cutscene |
 
-## Сюжет
+## Story
 
-Земля мертва. Боевая машина V-13 просыпается с пустыми баками —
-и находит альтернативное топливо: кровь. Башня зовёт вниз, слой за слоем:
+Earth is silent. Combat machine V-13 reactivates with empty fuel
+reserves — and finds an alternative: blood. The tower calls downward,
+layer by layer:
 
-1. **THE YARD** — открытый двор со ступенчатой башней.
-2. **THE CATACOMBS** — лабиринт колонн и надземных мостиков.
-3. **THE ALTAR** — вертикальный шпиль, на вершине которого ждёт
-   **THE WARDEN**.
+1. **THE YARD** — an open courtyard with a stepped tower.
+2. **THE CATACOMBS** — a maze of pillars and overhead walkways.
+3. **THE ALTAR** — a vertical spire crowned by **THE WARDEN**.
 
-Каждый слой — 4 волны, третий заканчивается боссом. Убей Хранителя —
-и башня предложит только одно: глубже. LOOP 2. LOOP 3...
+Each layer is 4 waves; the third ends with the boss. Kill the Warden and
+the tower offers only one thing: deeper. LOOP 2. LOOP 3...
 
-## Установка как приложение (Flatpak)
+## Downloads (CI artifacts)
 
-Готовый бандл собирается CI на каждый пуш: вкладка
-[**Actions**](https://github.com/shidikusik/Fps/actions) → последний
-зелёный запуск **Flatpak** → артефакт `bloodrush-x86_64.flatpak`
-(скачается zip-архивом — распакуйте), затем:
+Every push builds ready-to-run packages — grab them from
+[**Actions**](https://github.com/shidikusik/Fps/actions), latest green run
+(artifacts download as zip archives; sign-in to GitHub required):
 
-```sh
-flatpak install --user bloodrush-x86_64.flatpak
-flatpak run io.github.shidikusik.Bloodrush
-```
+| Platform | Workflow | Artifact |
+|---|---|---|
+| Linux (Flatpak) | Flatpak | `bloodrush-x86_64.flatpak` |
+| Windows 10/11 x64 | Builds | `bloodrush-windows-x86_64` (`bloodrush.exe`) |
+| Android 7.0+ (arm64) | Builds | `bloodrush-android` (`bloodrush.apk`) |
 
-Игра появится в меню приложений с иконкой, как обычное приложение.
-Локальная сборка Flatpak и инструкция по публикации на Flathub —
-в [packaging/flatpak/](packaging/flatpak/).
+- **Linux**: `flatpak install --user bloodrush-x86_64.flatpak`, then launch
+  from the app menu.
+- **Windows**: unzip and run `bloodrush.exe` — fully standalone, no
+  dependencies.
+- **Android**: install the APK (allow "unknown sources"; it is signed with
+  a debug key). Touch controls: left half — movement stick, right half —
+  look, on-screen buttons for fire/jump/dash/slide/weapons.
 
-## Установка на любом дистрибутиве Linux
+## Building from source (Linux)
 
-Нужны только: **компилятор C++ (GCC/Clang), CMake ≥ 3.16 и git**.
-raylib ставить не обязательно — если его нет в системе, CMake сам
-скачает и соберёт raylib 5.5 внутри проекта.
+Only **a C++ compiler (GCC/Clang), CMake ≥ 3.16 and git** are required.
+raylib is optional — when missing, CMake downloads and builds raylib 5.5
+inside the project.
 
-### 1. Зависимости
+### 1. Dependencies
 
 **Arch / Manjaro / EndeavourOS:**
 ```sh
@@ -77,21 +85,13 @@ sudo zypper install -y gcc-c++ cmake git \
     libXcursor-devel libXi-devel wayland-devel libxkbcommon-devel wayland-protocols-devel
 ```
 
-**Void:**
-```sh
-sudo xbps-install -S gcc cmake git raylib-devel
-```
+**Void:** `sudo xbps-install -S gcc cmake git raylib-devel` ·
+**Gentoo:** `sudo emerge --ask dev-build/cmake media-libs/raylib`
 
-**Gentoo:**
-```sh
-sudo emerge --ask dev-build/cmake media-libs/raylib
-```
+**Any other distro:** install `gcc`/`clang`, `cmake`, `git` and the
+X11/OpenGL dev headers — the build handles the rest.
 
-**Любой другой дистрибутив:** поставьте `gcc`/`clang`, `cmake`, `git`
-и dev-пакеты X11/OpenGL (обычно называются `libX11-devel`,
-`mesa-libGL-devel` или похоже) — остальное сборка сделает сама.
-
-### 2. Сборка и запуск
+### 2. Build & run
 
 ```sh
 git clone https://github.com/shidikusik/Fps.git
@@ -102,100 +102,113 @@ make -j$(nproc)
 ./bloodrush
 ```
 
-Если raylib есть в системе — сборка займёт секунды. Если нет — CMake
-скачает raylib 5.5 и соберёт его один раз (пара минут).
-
-### 3. (Необязательно) иконка в меню приложений
+### 3. (Optional) app menu entry
 
 ```sh
 sudo make install
 ```
 
-Установит бинарник, `.desktop`-файл и иконку — игра появится в меню
-приложений без всякого Flatpak.
+Installs the binary, `.desktop` file and icon — the game shows up in your
+app menu without any Flatpak.
 
-### Возможные проблемы
+## Building for other platforms
 
-- **`cmake: command not found`** — установите cmake из пакетного
-  менеджера (шаг 1).
-- **Ошибка про `GL/gl.h` или `X11/Xlib.h`** — не хватает dev-заголовков
-  графики, поставьте пакеты из шага 1 для вашего дистрибутива.
-- **Нет звука** — игра работает и без звуковой карты; звук процедурный
-  и включится сам, если аудиоустройство доступно.
-- **Wayland** — работает из коробки. Если системный raylib собран без
-  Wayland, игра прозрачно запустится через XWayland; для гарантированно
-  нативного Wayland соберите так: `cmake .. -DCMAKE_DISABLE_FIND_PACKAGE_raylib=ON`.
+- **Windows (cross-compile from Linux):**
+  ```sh
+  sudo apt install mingw-w64
+  cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake
+  cmake --build build-win -j$(nproc)
+  ```
+  Produces a standalone `bloodrush.exe` (static runtime, system DLLs only).
+- **Android:** with Android SDK + NDK installed,
+  `bash android/build_apk.sh` builds and signs `build-android/bloodrush.apk`
+  (arm64-v8a, NativeActivity, min SDK 24).
+- **Flatpak:** see [packaging/flatpak/](packaging/flatpak/) — includes the
+  Flathub submission guide.
 
-## Управление
+### Troubleshooting
 
-| Клавиша | Действие |
+- **`cmake: command not found`** — install cmake (step 1).
+- **`GL/gl.h` or `X11/Xlib.h` errors** — missing graphics dev headers,
+  install the packages from step 1.
+- **No sound** — the game runs fine without an audio device; sound is
+  procedural and enables itself when one is available.
+- **Wayland** — works out of the box. If your system raylib lacks Wayland,
+  the game transparently runs via XWayland; for guaranteed native Wayland
+  build with `cmake .. -DCMAKE_DISABLE_FIND_PACKAGE_raylib=ON`.
+
+## Controls
+
+| Key | Action |
 |---|---|
-| WASD + мышь | движение / обзор |
-| SPACE | прыжок (держать — bunny hop без потери скорости) |
-| SHIFT | dash (3 заряда, восстанавливаются) |
-| CTRL (на земле) | slide с ускорением |
-| CTRL (в воздухе) | ground slam; прыжок сразу после приземления — усиленный |
-| ЛКМ | огонь |
-| ПКМ (держать) | заряженный выстрел револьвера — пробивает всех насквозь |
-| 1–4 / колесо | смена оружия |
-| ENTER / клик | старт, скип катсцен, рестарт |
-| ESC | пауза |
-| F11 | полный экран |
+| WASD + mouse | move / look |
+| SPACE | jump (hold — bunny hop with no speed loss) |
+| SHIFT | dash (3 recharging charges) |
+| CTRL (grounded) | slide with a speed boost |
+| CTRL (airborne) | ground slam; jumping right after landing is boosted |
+| LMB | fire |
+| RMB (hold) | revolver charged shot — pierces everything |
+| 1–4 / wheel | switch weapons |
+| ENTER / click | start, skip cutscenes, retry |
+| ESC | pause |
+| F11 | fullscreen |
 
-## Боёвка
+On Android everything maps to the touch UI; on desktop you can preview it
+with `BLOODRUSH_TOUCH=1 ./bloodrush`.
 
-- **Кровь лечит.** Здоровье не восстанавливается само — только уроном
-  врагам в упор (ближе ~10 метров).
-- **Револьвер [1]** — мгновенный hitscan; альт-огонь (ПКМ) — заряженный
-  пробивающий выстрел.
-- **Дробовик [2]** — 10 физических дробин с разбросом.
-- **Нейлган [3]** — автоматический поток гвоздей, вращающийся ствол.
-- **Рейлган [4]** — 160 урона насквозь, долгая перезарядка (кольцо
-  готовности вокруг прицела).
-- **Парирование**: жёлтые снаряды Shooter'ов уничтожаются вашими
-  выстрелами — PARRY даёт стиль.
-- **Slam** по земле — AoE-урон вокруг точки приземления (SLAMDUNK!).
+## Combat
 
-## Враги
+- **Blood heals.** Health never regenerates on its own — only by dealing
+  damage up close (within ~10 meters).
+- **Revolver [1]** — instant hitscan; alt-fire (RMB) — charged piercing shot.
+- **Shotgun [2]** — 10 physical pellets with spread.
+- **Nailgun [3]** — automatic nail stream, spinning barrels.
+- **Railcannon [4]** — 160 damage through everything, long cooldown
+  (readiness ring around the crosshair).
+- **Parry**: the Shooters' yellow orbs can be destroyed by your shots —
+  PARRY grants style.
+- **Ground slam** — AoE damage around the landing point (SLAMDUNK!).
 
-- **Husk** — медленный, бьёт вблизи.
-- **Shooter** — парящий октаэдр, стреляет сбиваемыми снарядами.
-- **Berserker** — быстрый, прыгает на игрока.
-- **THE WARDEN** — босс на вершине Алтаря: прыжки с ударной волной
-  из сбиваемых снарядов, полоса здоровья, корона.
+## Enemies
 
-Каждый уровень — 4 волны, третий заканчивается боссом. После победы —
-NG+ цикл (LOOP): враги жирнее и их больше. Стайл-метр справа:
-D → C → B → A → S → ULTRAVIOLENT; растёт от убийств, разнообразия
-оружия, AIRSHOT/DASHKILL, падает при пассивности. Ранг умножает очки.
+- **Husk** — slow, melee.
+- **Shooter** — hovering octahedron firing destructible projectiles.
+- **Berserker** — fast, pounces at you.
+- **THE WARDEN** — the boss atop the Altar: leaps with a shockwave ring of
+  destructible shots, a health bar and a golden crown.
 
-## Техники движения
+Style meter on the right: D → C → B → A → S → ULTRAVIOLENT; grows with
+kills, weapon variety, AIRSHOT/DASHKILL, drains when passive. Rank
+multiplies score.
 
-- **Bhop**: держи SPACE и стрейфься мышью в воздухе — скорость растёт.
-- **Dash-jump**: прыжок во время dash сохраняет всю скорость рывка.
-- **Slide-jump**: прыжок из slide сохраняет скорость слайда.
-- **Slam storage**: прыжок в течение 0.25с после slam — усиленный прыжок.
+## Movement tech
 
-Скорость всегда показана на HUD слева внизу (UPS = units per second).
+- **Bhop**: hold SPACE and strafe with the mouse mid-air — speed grows.
+- **Dash-jump**: jumping during a dash keeps the full dash velocity.
+- **Slide-jump**: jumping out of a slide keeps slide speed.
+- **Slam storage**: jump within 0.25s after a slam for a boosted jump.
 
-## Структура кода
+Speed is always visible bottom-left (UPS = units per second).
 
-| Модуль | Что делает |
+## Code map
+
+| Module | Purpose |
 |---|---|
-| `src/player.*` | квейковская физика: bhop, dash, slide, slam, здоровье |
-| `src/weapons.*` | 4 оружия, hitscan/проджектайлы, viewmodel из примитивов |
-| `src/enemies.*` | 4 типа врагов, волны, уровни, босс, NG+ |
-| `src/arena.*` | 3 арены из AABB-блоков, спавн-пады |
-| `src/style_meter.*` | ранги D→ULTRAVIOLENT, попапы, счёт |
-| `src/particles.*` | кровь-кубики и искры с физикой |
-| `src/cutscene.*` | letterbox-катсцены с typewriter-текстом |
-| `src/sounds.*` | процедурная генерация всех звуков при старте |
-| `src/shading.h` | направленный свет + туман глубины (GLSL) |
-| `src/config.h` | все константы движения и рендера в одном месте |
+| `src/player.*` | quake-style physics: bhop, dash, slide, slam, health |
+| `src/weapons.*` | 4 weapons, hitscan/projectiles, primitive viewmodels |
+| `src/enemies.*` | 4 enemy types, waves, levels, boss, NG+ |
+| `src/arena.*` | 3 arenas built from AABB blocks, spawn pads |
+| `src/style_meter.*` | D→ULTRAVIOLENT ranks, popups, score |
+| `src/particles.*` | physical blood cubes and sparks |
+| `src/cutscene.*` | letterboxed typewriter cutscenes |
+| `src/touch.*` | Android touch controls (stick, look, buttons) |
+| `src/sounds.*` | all sounds procedurally generated at startup |
+| `src/shading.h` | directional light + depth fog (GLSL 330 / ES 100) |
+| `src/config.h` | every movement/render constant in one place |
 
-Тюнинг баланса: урон и кулдауны — в шапке `weapons.cpp`, здоровье и
-скорости врагов — в шапке `enemies.cpp`, движение — в `config.h`.
+Balance tuning: damage and cooldowns at the top of `weapons.cpp`, enemy
+health and speeds at the top of `enemies.cpp`, movement in `config.h`.
 
-## Лицензия
+## License
 
-MIT — см. [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

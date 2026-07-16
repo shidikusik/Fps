@@ -12,12 +12,22 @@ class StyleMeter;
 enum class WeaponType { Revolver = 0, Shotgun = 1, Nailgun = 2, Railcannon = 3 };
 inline constexpr int NUM_WEAPONS = 4;
 
+// Combat input, gathered by the caller (mouse/keys on desktop, touch UI
+// on Android) so weapons never read devices directly.
+struct CombatInput {
+    bool fireHeld = false;
+    bool altHeld = false;      // revolver charge
+    int  select = -1;          // 0..3 direct weapon select, -1 = none
+    int  cycle = 0;            // +1/-1 wheel or touch cycle button
+    float lookDx = 0, lookDy = 0; // for viewmodel sway
+};
+
 class Weapons {
 public:
     void Reset();
-    // Reads mouse/keyboard directly; call only while the game is live.
     void Update(Player& pl, const Arena& arena, EnemyManager& enemies,
-                ParticleSystem& fx, StyleMeter& style, float dt);
+                ParticleSystem& fx, StyleMeter& style, const CombatInput& in,
+                float dt);
     void Draw3D() const;                        // tracers, pellets, muzzle flash
     void DrawViewmodel(const Player& pl) const; // call inside its own 3D pass
     void DrawHUD() const;                       // weapon name, charge ring, hitmarker

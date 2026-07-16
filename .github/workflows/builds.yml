@@ -1,0 +1,39 @@
+name: Builds
+
+on:
+  push:
+    branches: [claude/bloodrush-fps-game-01wbax]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MinGW-w64
+        run: sudo apt-get update && sudo apt-get install -y mingw-w64
+      - name: Cross-compile
+        run: |
+          cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake
+          cmake --build build-win -j$(nproc)
+      - name: Stage
+        run: |
+          mkdir -p dist
+          cp build-win/bloodrush.exe dist/
+          cp README.md README.ru.md LICENSE dist/ || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bloodrush-windows-x86_64
+          path: dist/
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build APK
+        run: bash android/build_apk.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bloodrush-android
+          path: build-android/bloodrush.apk

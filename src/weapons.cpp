@@ -327,7 +327,8 @@ void Weapons::UpdatePellets(Player& pl, const Arena& arena, EnemyManager& enemie
 }
 
 void Weapons::Update(Player& pl, const Arena& arena, EnemyManager& enemies,
-                     ParticleSystem& fx, StyleMeter& style, float dt) {
+                     ParticleSystem& fx, StyleMeter& style, const CombatInput& in,
+                     float dt) {
     cd_ = std::max(0.0f, cd_ - dt);
     recoil_ = std::max(0.0f, recoil_ - dt * 6);
     muzzle_ = std::max(0.0f, muzzle_ - dt * 14);
@@ -338,24 +339,18 @@ void Weapons::Update(Player& pl, const Arena& arena, EnemyManager& enemies,
     // nailgun barrel spin-down + viewmodel look sway
     spin_ += spinVel_ * dt;
     spinVel_ = std::max(0.0f, spinVel_ - dt * 1400.0f);
-    Vector2 md = GetMouseDelta();
-    swayX_ += (Clamp(-md.x * 0.0022f, -0.05f, 0.05f) - swayX_) * std::min(1.0f, dt * 10);
-    swayY_ += (Clamp(md.y * 0.0018f, -0.04f, 0.04f) - swayY_) * std::min(1.0f, dt * 10);
+    swayX_ += (Clamp(-in.lookDx * 0.0022f, -0.05f, 0.05f) - swayX_) * std::min(1.0f, dt * 10);
+    swayY_ += (Clamp(in.lookDy * 0.0018f, -0.04f, 0.04f) - swayY_) * std::min(1.0f, dt * 10);
 
     for (auto& b : beams_) b.t -= dt;
     beams_.erase(std::remove_if(beams_.begin(), beams_.end(),
                                 [](const Beam& b) { return b.t <= 0; }),
                  beams_.end());
 
-    // switching: 1-4 keys or mouse wheel cycling
     WeaponType want = current;
-    if (IsKeyPressed(KEY_ONE)) want = WeaponType::Revolver;
-    if (IsKeyPressed(KEY_TWO)) want = WeaponType::Shotgun;
-    if (IsKeyPressed(KEY_THREE)) want = WeaponType::Nailgun;
-    if (IsKeyPressed(KEY_FOUR)) want = WeaponType::Railcannon;
-    float wheel = GetMouseWheelMove();
-    if (wheel != 0) {
-        int idx = ((int)current + (wheel > 0 ? 1 : NUM_WEAPONS - 1)) % NUM_WEAPONS;
+    if (in.select >= 0 && in.select < NUM_WEAPONS) want = (WeaponType)in.select;
+    if (in.cycle != 0) {
+        int idx = ((int)current + (in.cycle > 0 ? 1 : NUM_WEAPONS - 1)) % NUM_WEAPONS;
         want = (WeaponType)idx;
     }
     if (want != current) {
@@ -367,9 +362,9 @@ void Weapons::Update(Player& pl, const Arena& arena, EnemyManager& enemies,
     }
     if (switchT_ < 0.4f) return; // still raising the gun
 
-    // revolver alt-fire: hold RMB to charge, release to fire the piercing shot
+    // revolver alt-fire: hold to charge, release to fire the piercing shot
     if (current == WeaponType::Revolver) {
-        if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) && cd_ <= 0) {
+        if (in.altHeld && cd_ <= 0) {
             charging_ = true;
             float prev = charge_;
             charge_ = std::min(1.0f, charge_ + dt / CHARGE_TIME);
@@ -382,7 +377,7 @@ void Weapons::Update(Player& pl, const Arena& arena, EnemyManager& enemies,
         }
     }
 
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && cd_ <= 0 && !charging_) {
+    if (in.fireHeld && cd_ <= 0 && !charging_) {
         switch (current) {
             case WeaponType::Revolver:   FireRevolver(pl, arena, enemies, fx, style); break;
             case WeaponType::Shotgun:    FireShotgun(pl, fx); break;
