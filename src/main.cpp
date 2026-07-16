@@ -10,13 +10,16 @@
 #include "cutscene.h"
 #include "enemies.h"
 #include "localization.h"
+#include "machine.h"
 #include "particles.h"
 #include "player.h"
+#include "settings.h"
 #include "shading.h"
 #include "sounds.h"
 #include "style_meter.h"
 #include "touch.h"
 #include "ui.h"
+#include "voice.h"
 #include "weapons.h"
 
 #include <cmath>
@@ -32,13 +35,93 @@ constexpr Color HUD_YELLOW = { 255, 230, 0, 255 };
 constexpr Color HUD_WHITE  = { 235, 230, 230, 255 };
 constexpr Color HUD_DIM    = { 120, 60, 64, 255 };
 
-enum class GameState { Menu, Cutscene, Playing, Paused, Dead };
+enum class GameState { Menu, Settings, Cutscene, Playing, Paused, Dead };
 enum class AfterCutscene { BeginRun, ResumePlay };
 
-Rectangle LangButtonRect() {
-    const char* label = loc::T("LANGUAGE: ENGLISH [L]", "ЯЗЫК: РУССКИЙ [L]");
+Rectangle SettingsButtonRect() {
+    const char* label = loc::T("SETTINGS [S]", "НАСТРОЙКИ [S]");
     float w = (float)ui::Measure(label, 14) + 24;
     return { 16, (float)cfg::RENDER_H - 46, w, 30 };
+}
+
+// --- settings screen: rows of clickable controls ---
+struct SettingsRects {
+    Rectangle lang, sensMinus, sensPlus, volMinus, volPlus, back;
+};
+
+SettingsRects GetSettingsRects() {
+    const float W = (float)cfg::RENDER_W;
+    SettingsRects r;
+    float y = 250;
+    r.lang = { W / 2 + 40, y - 6, 260, 36 };
+    y += 80;
+    r.sensMinus = { W / 2 + 40, y - 6, 48, 36 };
+    r.sensPlus = { W / 2 + 220, y - 6, 48, 36 };
+    y += 80;
+    r.volMinus = { W / 2 + 40, y - 6, 48, 36 };
+    r.volPlus = { W / 2 + 220, y - 6, 48, 36 };
+    r.back = { W / 2 - 90, 520, 180, 44 };
+    return r;
+}
+
+void DrawButton(Rectangle rc, const char* label, int size, Color col) {
+    DrawRectangleRec(rc, Fade(BLACK, 0.4f));
+    DrawRectangleLinesEx(rc, 1, { 120, 60, 64, 255 });
+    ui::Text(label, (int)(rc.x + rc.width / 2) - ui::Measure(label, size) / 2,
+             (int)(rc.y + rc.height / 2) - size / 2, size, col);
+}
+
+void DrawSettingsScreen() {
+    const int W = cfg::RENDER_W, H = cfg::RENDER_H;
+    DrawRectangle(0, 0, W, H, { 8, 4, 6, 200 });
+    ui::TextCentered(loc::T("SETTINGS", "НАСТРОЙКИ"), 140, 40, { 230, 30, 40, 255 });
+
+    SettingsRects r = GetSettingsRects();
+    const settings::Values& v = settings::Get();
+    char buf[32];
+    Color white = { 235, 230, 230, 255 };
+    Color yellow = { 255, 230, 0, 255 };
+
+    ui::Text(loc::T("LANGUAGE", "ЯЗЫК"), W / 2 - 340, (int)r.lang.y + 10, 18, white);
+    DrawButton(r.lang, v.lang == 1 ? "РУССКИЙ" : "ENGLISH", 16, yellow);
+
+    ui::Text(loc::T("SENSITIVITY", "ЧУВСТВИТЕЛЬНОСТЬ"), W / 2 - 340,
+             (int)r.sensMinus.y + 10, 18, white);
+    DrawButton(r.sensMinus, "-", 18, yellow);
+    snprintf(buf, sizeof(buf), "%.1f", v.sensitivity);
+    ui::Text(buf, W / 2 + 130 - ui::Measure(buf, 18) / 2, (int)r.sensMinus.y + 10, 18, white);
+    DrawButton(r.sensPlus, "+", 18, yellow);
+
+    ui::Text(loc::T("VOLUME", "ГРОМКОСТЬ"), W / 2 - 340, (int)r.volMinus.y + 10, 18, white);
+    DrawButton(r.volMinus, "-", 18, yellow);
+    snprintf(buf, sizeof(buf), "%d%%", (int)(v.volume * 100 + 0.5f));
+    ui::Text(buf, W / 2 + 130 - ui::Measure(buf, 18) / 2, (int)r.volMinus.y + 10, 18, white);
+    DrawButton(r.volPlus, "+", 18, yellow);
+
+    DrawButton(r.back, loc::T("BACK", "НАЗАД"), 18, white);
+}
+
+// returns true if the settings screen should close
+bool UpdateSettingsScreen(Vector2 mp) {
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_Q) ||
+        IsKeyPressed(KEY_BACK)) return true;
+    if (IsKeyPressed(KEY_L)) { loc::Toggle(); sfx::Play(sfx::CLICK, 0.6f); }
+    if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return false;
+
+    SettingsRects r = GetSettingsRects();
+    settings::Values& v = settings::Get();
+    bool changed = false;
+    if (CheckCollisionPointRec(mp, r.lang)) { loc::Toggle(); changed = true; }
+    else if (CheckCollisionPointRec(mp, r.sensMinus)) { v.sensitivity = fmaxf(0.4f, v.sensitivity - 0.1f); changed = true; }
+    else if (CheckCollisionPointRec(mp, r.sensPlus)) { v.sensitivity = fminf(2.0f, v.sensitivity + 0.1f); changed = true; }
+    else if (CheckCollisionPointRec(mp, r.volMinus)) { v.volume = fmaxf(0.0f, v.volume - 0.1f); settings::ApplyVolume(); changed = true; }
+    else if (CheckCollisionPointRec(mp, r.volPlus)) { v.volume = fminf(1.0f, v.volume + 0.1f); settings::ApplyVolume(); changed = true; }
+    else if (CheckCollisionPointRec(mp, r.back)) return true;
+    if (changed) {
+        settings::Save();
+        sfx::Play(sfx::CLICK, 0.6f);
+    }
+    return false;
 }
 
 PlayerInput GatherInput() {
@@ -176,8 +259,8 @@ void DrawMenu() {
     const int W = cfg::RENDER_W, H = cfg::RENDER_H;
     DrawRectangle(0, 0, W, H, { 8, 4, 6, 140 });
     DrawCenteredText("BLOODRUSH", H / 2 - 160, 72, HUD_RED);
-    DrawCenteredText(loc::T("MANKIND IS DEAD. BLOOD IS FUEL.",
-                            "ЧЕЛОВЕЧЕСТВО МЕРТВО. КРОВЬ — ТОПЛИВО."),
+    DrawCenteredText(loc::T("YOU ARE THE MACHINE. BLOOD IS FUEL.",
+                            "ТЫ — МАШИНА. КРОВЬ — ТОПЛИВО."),
                      H / 2 - 72, 16, HUD_DIM);
     if (fmodf((float)GetTime() * 1.6f, 1.0f) > 0.35f)
         DrawCenteredText(loc::T("CLICK OR ENTER TO START", "КЛИК ИЛИ ENTER — СТАРТ"),
@@ -188,26 +271,26 @@ void DrawMenu() {
         "SHIFT  dash    CTRL  slide / air slam",
         "LMB fire   RMB hold  charged shot   1-4 weapons",
         "Blood heals: deal damage up close",
-        "3 layers. 4 waves each. The Warden waits below.",
+        "5 layers. 4 waves each. The Warden waits below.",
     };
     const char* linesRu[] = {
         "WASD + мышь  движение    SPACE держать  bhop",
         "SHIFT  рывок    CTRL  подкат / удар вниз",
         "ЛКМ огонь   ПКМ держать  заряж. выстрел   1-4 оружие",
         "Кровь лечит: бей врагов в упор",
-        "3 слоя по 4 волны. Внизу ждёт Хранитель.",
+        "5 слоёв по 4 волны. Внизу ждёт Хранитель.",
     };
     for (int i = 0; i < 5; i++)
         DrawCenteredText(loc::T(linesEn[i], linesRu[i]), H / 2 + 56 + i * 26, 14,
                          HUD_WHITE);
     DrawCenteredText(loc::T("Q — QUIT", "Q — ВЫХОД"), H - 34, 14, HUD_DIM);
 
-    // language toggle button
-    Rectangle lb = LangButtonRect();
-    DrawRectangleRec(lb, Fade(BLACK, 0.4f));
-    DrawRectangleLinesEx(lb, 1, HUD_DIM);
-    ui::Text(loc::T("LANGUAGE: ENGLISH [L]", "ЯЗЫК: РУССКИЙ [L]"),
-             (int)lb.x + 12, (int)lb.y + 8, 14, HUD_WHITE);
+    // settings button
+    Rectangle sb = SettingsButtonRect();
+    DrawRectangleRec(sb, Fade(BLACK, 0.4f));
+    DrawRectangleLinesEx(sb, 1, HUD_DIM);
+    ui::Text(loc::T("SETTINGS [S]", "НАСТРОЙКИ [S]"),
+             (int)sb.x + 12, (int)sb.y + 8, 14, HUD_WHITE);
 }
 
 void DrawPauseOverlay() {
@@ -263,8 +346,9 @@ int main() {
     InitWindow(1280, 720, "BLOODRUSH");
     SetExitKey(KEY_NULL);
     sfx::Init();
+    voice::Init();
     ui::Init();
-    loc::LoadPref();
+    settings::Load();
 
     RenderTexture2D target = LoadRenderTexture(cfg::RENDER_W, cfg::RENDER_H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
@@ -272,6 +356,9 @@ int main() {
 
     Arena arena;
     arena.Init(1);
+    // dev hook: preview any arena from the menu orbit camera
+    if (const char* lv = getenv("BLOODRUSH_LEVEL"))
+        arena.Init(Clamp(atoi(lv), 1, Arena::NUM_LEVELS));
 
     Player player;
     EnemyManager enemies;
@@ -292,6 +379,7 @@ int main() {
 
     GameState state = GameState::Menu;
     float shakeTime = 0;
+    float legAnim = 0;
     bool quit = false;
     const bool autoAim = getenv("BLOODRUSH_AUTOTEST") != nullptr;
 #ifdef __ANDROID__
@@ -314,23 +402,29 @@ int main() {
 
         switch (state) {
             case GameState::Menu: {
-                bool langClicked = false;
+                bool uiClicked = false;
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     Vector2 mp = map.ToRender(GetMousePosition());
-                    if (CheckCollisionPointRec(mp, LangButtonRect())) {
-                        langClicked = true;
-                        loc::Toggle();
+                    if (CheckCollisionPointRec(mp, SettingsButtonRect())) {
+                        uiClicked = true;
+                        state = GameState::Settings;
                         sfx::Play(sfx::CLICK, 0.6f);
+                        break;
                     }
+                }
+                if (IsKeyPressed(KEY_S)) {
+                    state = GameState::Settings;
+                    sfx::Play(sfx::CLICK, 0.6f);
+                    break;
                 }
                 if (IsKeyPressed(KEY_L)) {
                     loc::Toggle();
                     sfx::Play(sfx::CLICK, 0.6f);
                 }
-                if ((IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !langClicked) ||
+                if ((IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !uiClicked) ||
                     IsKeyPressed(KEY_ENTER)) {
                     resetRun();
-                    cutscene.Start(loc::IntroLines());
+                    cutscene.Start(loc::IntroLines(), true); // voiced intro
                     afterCutscene = AfterCutscene::BeginRun;
                     state = GameState::Cutscene;
                     sfx::Play(sfx::CLICK);
@@ -338,6 +432,11 @@ int main() {
                 if (IsKeyPressed(KEY_Q)) quit = true;
                 break;
             }
+
+            case GameState::Settings:
+                if (UpdateSettingsScreen(map.ToRender(GetMousePosition())))
+                    state = GameState::Menu;
+                break;
 
             case GameState::Cutscene:
                 cutscene.Update(dt);
@@ -449,7 +548,7 @@ int main() {
 
         // Camera
         Camera3D cam;
-        if (state == GameState::Menu) {
+        if (state == GameState::Menu || state == GameState::Settings) {
             cam = CinematicCamera(fmodf((float)GetTime() * 0.02f, 1.0f), arena.Level());
         } else if (state == GameState::Cutscene) {
             cam = CinematicCamera(cutscene.Progress(), arena.Level());
@@ -470,6 +569,25 @@ int main() {
         enemies.Draw();
         weapons.Draw3D();
         particles.Draw();
+        // THE MACHINE: showcase in front of the menu camera, legs in-game
+        if (state == GameState::Menu || state == GameState::Settings ||
+            state == GameState::Cutscene) {
+            Vector3 dir = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
+            Vector3 right = Vector3Normalize(Vector3CrossProduct(dir, { 0, 1, 0 }));
+            float side = state == GameState::Cutscene ? 0.0f : 4.6f;
+            float dist = state == GameState::Cutscene ? 10.0f : 7.5f;
+            Vector3 p = Vector3Add(cam.position, Vector3Scale(dir, dist));
+            p = Vector3Add(p, Vector3Scale(right, side));
+            p.y -= state == GameState::Cutscene ? 3.4f : 2.6f;
+            float faceYaw = RAD2DEG * atan2f(cam.position.x - p.x,
+                                             cam.position.z - p.z);
+            machine::Draw(p, faceYaw + sinf((float)GetTime() * 0.5f) * 14.0f,
+                          (float)GetTime(), 1.5f);
+        } else if (player.pitch < -30.0f && !player.Dead()) {
+            legAnim += dt * player.HorizontalSpeed() * 0.35f;
+            machine::DrawLegsOnly(player.pos, player.yaw + 180.0f, legAnim,
+                                  player.HorizontalSpeed());
+        }
         EndShaderMode();
         EndMode3D();
 
@@ -497,6 +615,7 @@ int main() {
         }
 
         if (state == GameState::Menu) DrawMenu();
+        else if (state == GameState::Settings) DrawSettingsScreen();
         else if (state == GameState::Cutscene) cutscene.Draw();
         else if (state == GameState::Paused) DrawPauseOverlay();
         else if (state == GameState::Dead) DrawDeathOverlay(enemies, style, arena);
@@ -515,6 +634,7 @@ int main() {
     UnloadShader(shading);
     UnloadRenderTexture(target);
     ui::Shutdown();
+    voice::Shutdown();
     sfx::Shutdown();
     CloseWindow();
     return 0;

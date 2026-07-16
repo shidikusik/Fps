@@ -120,15 +120,25 @@ void EnemyManager::StartWave(int w, const Arena& arena) {
             shooters = w;
             berserkers = (w + 1) / 2;
             break;
-        default: // 3
+        case 3:
+            husks = 5 + w * 2;
+            shooters = w + 1;
+            berserkers = w;
+            break;
+        case 4:
+            husks = 6 + w * 2;
+            shooters = w + 1;
+            berserkers = w + 1;
+            break;
+        default: // 5: the Warden's floor
             if (w == WAVES_PER_LEVEL) {
                 boss = true;
                 husks = 4;
                 shooters = 2;
             } else {
-                husks = 5 + w * 2;
-                shooters = w + 1;
-                berserkers = w;
+                husks = 6 + w * 2;
+                shooters = w + 2;
+                berserkers = w + 1;
             }
             break;
     }
@@ -148,7 +158,7 @@ void EnemyManager::StartWave(int w, const Arena& arena) {
     for (int i = 0; i < husks; i++)      { Spawn(EnemyType::Husk, pad(), delay); delay += 0.35f; }
     for (int i = 0; i < shooters; i++)   { Spawn(EnemyType::Shooter, pad(), delay); delay += 0.45f; }
     for (int i = 0; i < berserkers; i++) { Spawn(EnemyType::Berserker, pad(), delay); delay += 0.6f; }
-    if (boss) Spawn(EnemyType::Warden, { 0, 13.5f, 0 }, 1.0f); // atop the spire
+    if (boss) Spawn(EnemyType::Warden, arena.BossPad(), 1.0f); // on the throne
 
     sfx::Play(sfx::WAVE, boss ? 1.0f : 0.9f, boss ? 0.7f : 1.0f);
 }

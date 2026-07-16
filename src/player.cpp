@@ -1,6 +1,7 @@
 #include "player.h"
 #include "arena.h"
 #include "config.h"
+#include "settings.h"
 #include "sounds.h"
 #include "raymath.h"
 
@@ -118,8 +119,9 @@ void Player::EndSlide() {
 
 void Player::Update(const PlayerInput& in, const Arena& arena, float dt) {
     // --- look ---
-    yaw += in.mouseDx * MOUSE_SENS;
-    pitch = Clamp(pitch - in.mouseDy * MOUSE_SENS, -89.0f, 89.0f);
+    float sens = MOUSE_SENS * settings::Get().sensitivity;
+    yaw += in.mouseDx * sens;
+    pitch = Clamp(pitch - in.mouseDy * sens, -89.0f, 89.0f);
 
     // --- timers ---
     trauma = std::max(0.0f, trauma - dt * 2.2f);

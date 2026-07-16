@@ -3,6 +3,7 @@
 #include "localization.h"
 #include "sounds.h"
 #include "ui.h"
+#include "voice.h"
 #include "raylib.h"
 
 #include <cmath>
@@ -12,16 +13,23 @@ constexpr float CHARS_PER_SEC = 30.0f;
 constexpr float LINE_HOLD = 1.3f;
 }
 
-void Cutscene::Start(std::vector<std::string> lines) {
+void Cutscene::Start(std::vector<std::string> lines, bool voiced) {
     lines_ = std::move(lines);
     line_ = 0;
     chars_ = 0;
     holdT_ = 0;
     totalT_ = 0;
     finished_ = lines_.empty();
+    voiced_ = voiced;
+    voicedLine_ = (size_t)-1;
     expectedT_ = 0.01f;
     for (const auto& l : lines_)
         expectedT_ += l.size() / CHARS_PER_SEC + LINE_HOLD;
+}
+
+void Cutscene::Skip() {
+    finished_ = true;
+    voice::StopAll();
 }
 
 float Cutscene::Progress() const {
@@ -32,12 +40,16 @@ float Cutscene::Progress() const {
 void Cutscene::Update(float dt) {
     if (finished_) return;
     totalT_ += dt;
+    if (voiced_ && line_ != voicedLine_) {
+        voice::PlayIntroLine((int)line_);
+        voicedLine_ = line_;
+    }
     const std::string& cur = lines_[line_];
     if (chars_ < (float)cur.size()) {
         float prev = chars_;
         chars_ += dt * CHARS_PER_SEC;
-        // typewriter blips
-        if ((int)(chars_ / 3) != (int)(prev / 3))
+        // typewriter blips (quieter when the line is voiced)
+        if (!voiced_ && (int)(chars_ / 3) != (int)(prev / 3))
             sfx::Play(sfx::CLICK, 0.18f, 1.6f + 0.15f * (line_ % 3));
     } else {
         holdT_ += dt;

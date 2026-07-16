@@ -22,6 +22,8 @@ void Arena::Init(int level) {
     switch (level) {
         case 2:  BuildCatacombs(); break;
         case 3:  BuildAltar(); break;
+        case 4:  BuildFurnace(); break;
+        case 5:  BuildThrone(); break;
         default: BuildYard(); break;
     }
 }
@@ -30,6 +32,7 @@ void Arena::Init(int level) {
 void Arena::BuildYard() {
     name_ = "THE YARD";
     spawn_ = { 0.0f, 2.0f, 30.0f };
+    showcase_ = { 0, 6.0f, 0 };
     gridColor_ = { 60, 24, 28, 255 };
 
     const Color BLOCK_BLACK = { 24, 18, 20, 255 };
@@ -83,6 +86,7 @@ void Arena::BuildYard() {
 void Arena::BuildCatacombs() {
     name_ = "THE CATACOMBS";
     spawn_ = { 0.0f, 2.0f, 34.0f };
+    showcase_ = { 0, 1.5f, 0 };
     gridColor_ = { 54, 30, 18, 255 };
 
     const Color STONE      = { 34, 22, 26, 255 };
@@ -128,6 +132,7 @@ void Arena::BuildCatacombs() {
 void Arena::BuildAltar() {
     name_ = "THE ALTAR";
     spawn_ = { 0.0f, 2.0f, 38.0f };
+    showcase_ = { 0, 12.0f, 0 };
     gridColor_ = { 44, 40, 30, 255 };
 
     const Color OBSIDIAN = { 20, 18, 26, 255 };
@@ -173,6 +178,107 @@ void Arena::BuildAltar() {
     };
 }
 
+// --- Level 4: THE FURNACE — concentric heat rings, chimney stacks ---
+void Arena::BuildFurnace() {
+    name_ = "THE FURNACE";
+    spawn_ = { 0.0f, 2.0f, 40.0f };
+    showcase_ = { 0, 2.0f, 0 };
+    gridColor_ = { 70, 30, 10, 255 };
+    bossPad_ = { 0, 4.0f, 0 };
+
+    const Color IRON   = { 30, 18, 14, 255 };
+    const Color EMBER  = { 120, 40, 8, 255 };
+    const Color W_FIRE = { 255, 120, 0, 255 };
+    const Color W_HOT  = { 255, 200, 0, 255 };
+    const Color W_DIM  = { 90, 40, 16, 255 };
+
+    AddBlock({ 0, -1.0f, 0 }, { 105, 2, 105 }, FLOOR_DARK, W_DIM);
+
+    const float W = 52.0f, WH = 18.0f, WT = 2.0f;
+    AddBlock({ 0, WH * 0.5f, -W - WT * 0.5f }, { 2 * W + 2 * WT, WH, WT }, IRON, W_FIRE);
+    AddBlock({ 0, WH * 0.5f,  W + WT * 0.5f }, { 2 * W + 2 * WT, WH, WT }, IRON, W_FIRE);
+    AddBlock({ -W - WT * 0.5f, WH * 0.5f, 0 }, { WT, WH, 2 * W }, IRON, W_FIRE);
+    AddBlock({  W + WT * 0.5f, WH * 0.5f, 0 }, { WT, WH, 2 * W }, IRON, W_FIRE);
+
+    // central crucible: raised ring with a hot core
+    AddBlock({ 0, 1.0f, 0 }, { 12, 2, 12 }, EMBER, W_HOT);
+    // broken ring walls around it (gaps on the diagonals)
+    AddBlock({ 0, 2.0f, -18 }, { 24, 4, 3 }, IRON, W_FIRE);
+    AddBlock({ 0, 2.0f,  18 }, { 24, 4, 3 }, IRON, W_FIRE);
+    AddBlock({ -18, 2.0f, 0 }, { 3, 4, 24 }, IRON, W_FIRE);
+    AddBlock({  18, 2.0f, 0 }, { 3, 4, 24 }, IRON, W_FIRE);
+
+    // outer ring walkway with ramp-platform steps
+    AddBlock({ -30, 3.0f, -30 }, { 14, 1, 6 }, IRON, W_HOT);
+    AddBlock({  30, 3.0f, -30 }, { 14, 1, 6 }, IRON, W_HOT);
+    AddBlock({ -30, 3.0f,  30 }, { 14, 1, 6 }, IRON, W_HOT);
+    AddBlock({  30, 3.0f,  30 }, { 14, 1, 6 }, IRON, W_HOT);
+    AddBlock({ 0, 5.5f, -36 }, { 10, 1, 8 }, EMBER, W_HOT);
+    AddBlock({ 0, 5.5f,  36 }, { 10, 1, 8 }, EMBER, W_HOT);
+
+    // chimney stacks
+    AddBlock({ -40, 6.0f, 0 },  { 5, 12, 5 }, IRON, W_FIRE);
+    AddBlock({  40, 6.0f, 0 },  { 5, 12, 5 }, IRON, W_FIRE);
+    AddBlock({ -24, 4.5f, -24 },{ 4, 9, 4 },  EMBER, W_FIRE);
+    AddBlock({  24, 4.5f, 24 }, { 4, 9, 4 },  EMBER, W_FIRE);
+
+    pads_ = {
+        { -44, 0.5f, -44 }, { 44, 0.5f, -44 }, { -44, 0.5f, 44 }, { 44, 0.5f, 44 },
+        { 0, 0.5f, -46 },   { -46, 0.5f, 0 },  { 46, 0.5f, 0 },
+        { -30, 4.0f, -30 }, { 30, 4.0f, 30 },  { 0, 6.5f, -36 },
+    };
+}
+
+// --- Level 5: THE THRONE — grand staircase to the Warden's seat ---
+void Arena::BuildThrone() {
+    name_ = "THE THRONE";
+    spawn_ = { 0.0f, 2.0f, 44.0f };
+    showcase_ = { 0, 11.0f, -6.0f };
+    gridColor_ = { 50, 44, 34, 255 };
+    bossPad_ = { 0, 13.0f, -30 };
+
+    const Color MARBLE = { 40, 38, 44, 255 };
+    const Color GOLDBLK = { 70, 58, 30, 255 };
+    const Color W_GOLD = { 255, 220, 120, 255 };
+    const Color W_RED  = { 230, 30, 40, 255 };
+    const Color W_DIM  = { 70, 62, 48, 255 };
+
+    AddBlock({ 0, -1.0f, 0 }, { 110, 2, 120 }, FLOOR_DARK, W_DIM);
+
+    const float W = 55.0f, D = 60.0f, WH = 24.0f, WT = 2.0f;
+    AddBlock({ 0, WH * 0.5f, -D - WT * 0.5f }, { 2 * W + 2 * WT, WH, WT }, MARBLE, W_GOLD);
+    AddBlock({ 0, WH * 0.5f,  D + WT * 0.5f }, { 2 * W + 2 * WT, WH, WT }, MARBLE, W_GOLD);
+    AddBlock({ -W - WT * 0.5f, WH * 0.5f, 0 }, { WT, WH, 2 * D }, MARBLE, W_GOLD);
+    AddBlock({  W + WT * 0.5f, WH * 0.5f, 0 }, { WT, WH, 2 * D }, MARBLE, W_GOLD);
+
+    // grand staircase rising toward -Z, six steps
+    for (int i = 0; i < 6; i++) {
+        float h = 2.0f * (i + 1);
+        AddBlock({ 0, h - 1.0f, -6.0f - i * 6.0f }, { 26.0f - i * 2, 2, 6 },
+                 i % 2 ? GOLDBLK : MARBLE, W_GOLD);
+    }
+    // throne platform + the seat itself
+    AddBlock({ 0, 12.0f, -42 }, { 24, 2, 16 }, GOLDBLK, W_RED);
+    AddBlock({ 0, 15.0f, -48 }, { 8, 8, 3 }, MARBLE, W_RED);   // backrest
+    AddBlock({ 0, 13.8f, -45 }, { 6, 1.6f, 4 }, GOLDBLK, W_GOLD); // seat
+
+    // side colonnades
+    for (int i = 0; i < 4; i++) {
+        float z = 20.0f - i * 18.0f;
+        AddBlock({ -22, 5.0f, z }, { 4, 10, 4 }, MARBLE, W_GOLD);
+        AddBlock({  22, 5.0f, z }, { 4, 10, 4 }, MARBLE, W_GOLD);
+    }
+    // side galleries
+    AddBlock({ -34, 6.0f, -10 }, { 12, 1, 40 }, MARBLE, W_DIM);
+    AddBlock({  34, 6.0f, -10 }, { 12, 1, 40 }, MARBLE, W_DIM);
+
+    pads_ = {
+        { -46, 0.5f, 46 },  { 46, 0.5f, 46 },  { -46, 0.5f, -20 }, { 46, 0.5f, -20 },
+        { 0, 0.5f, 50 },    { -34, 7.0f, -10 },{ 34, 7.0f, -10 },
+        { -22, 11.0f, 20 }, { 22, 11.0f, 20 }, { 0, 13.0f, -42 },
+    };
+}
+
 void Arena::Draw() const {
     for (const Block& b : blocks_) {
         Vector3 c = {
@@ -190,7 +296,7 @@ void Arena::Draw() const {
     }
 
     // Floor grid for speed perception
-    float ext = level_ == 3 ? 55.0f : 50.0f;
+    float ext = level_ >= 3 ? 55.0f : 50.0f;
     for (int i = (int)-ext; i <= (int)ext; i += 5) {
         DrawLine3D({ (float)i, 0.02f, -ext }, { (float)i, 0.02f, ext }, gridColor_);
         DrawLine3D({ -ext, 0.02f, (float)i }, { ext, 0.02f, (float)i }, gridColor_);

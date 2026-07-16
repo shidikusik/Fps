@@ -8,7 +8,7 @@
 A frantic fast-paced first-person arena shooter in the spirit of ULTRAKILL.
 C++20 + raylib, retro low-poly, 720p render with pixel upscale, fully
 procedural sound — not a single asset file. Bunny hop, dash, slide, ground
-slam, a style meter and blood healing. **3 levels, story cutscenes,
+slam, a style meter and blood healing. **5 levels, story cutscenes with THE MACHINE voice-over,
 4 weapons, THE WARDEN boss and an endless NG+ loop after victory.**
 
 Runs on **Linux** (X11 & Wayland), **Windows** and **Android**.
@@ -21,15 +21,17 @@ Runs on **Linux** (X11 & Wayland), **Windows** and **Android**.
 
 ## Story
 
-Earth is silent. Combat machine V-13 reactivates with empty fuel
-reserves — and finds an alternative: blood. The tower calls downward,
-layer by layer:
+Earth is silent. **THE MACHINE** reactivates with empty fuel
+reserves — and finds an alternative: blood. The intro is fully voiced
+(procedural robotic speech, EN + RU). The tower calls downward:
 
 1. **THE YARD** — an open courtyard with a stepped tower.
 2. **THE CATACOMBS** — a maze of pillars and overhead walkways.
-3. **THE ALTAR** — a vertical spire crowned by **THE WARDEN**.
+3. **THE ALTAR** — a vertical spire.
+4. **THE FURNACE** — iron heat rings and chimney stacks.
+5. **THE THRONE** — a grand staircase to **THE WARDEN**.
 
-Each layer is 4 waves; the third ends with the boss. Kill the Warden and
+Each layer is 4 waves; the fifth ends with the boss. Kill the Warden and
 the tower offers only one thing: deeper. LOOP 2. LOOP 3...
 
 ## Downloads (CI artifacts)
@@ -150,13 +152,14 @@ app menu without any Flatpak.
 | RMB (hold) | revolver charged shot — pierces everything |
 | 1–4 / wheel | switch weapons |
 | ENTER / click | start, skip cutscenes, retry |
-| L (in menu) | language: English / Русский (also a clickable button) |
+| S (in menu) | settings: language, sensitivity, volume (clickable button too) |
 | ESC | pause |
 | F11 | fullscreen |
 
-The language choice covers the menu, HUD, cutscenes and touch labels
-(style popups and rank names stay English by design) and persists in
-`~/.config/bloodrush.lang`. Cyrillic is rendered by an embedded
+Settings (language / look sensitivity / master volume) are clickable —
+handy on Android — and persist in `~/.config/bloodrush.cfg`. The language
+covers menu, HUD, cutscenes and touch labels (style popups stay English
+by design). Cyrillic is rendered by an embedded
 Press Start 2P pixel font (OFL) — still zero asset files.
 
 On Android everything maps to the touch UI; on desktop you can preview it
@@ -180,7 +183,7 @@ with `BLOODRUSH_TOUCH=1 ./bloodrush`.
 - **Husk** — slow, melee.
 - **Shooter** — hovering octahedron firing destructible projectiles.
 - **Berserker** — fast, pounces at you.
-- **THE WARDEN** — the boss atop the Altar: leaps with a shockwave ring of
+- **THE WARDEN** — the boss on the Throne: leaps with a shockwave ring of
   destructible shots, a health bar and a golden crown.
 
 Style meter on the right: D → C → B → A → S → ULTRAVIOLENT; grows with

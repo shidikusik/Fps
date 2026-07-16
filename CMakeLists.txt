@@ -21,6 +21,9 @@ set(BLOODRUSH_SOURCES
     src/touch.cpp
     src/ui.cpp
     src/localization.cpp
+    src/settings.cpp
+    src/machine.cpp
+    src/voice.cpp
 )
 
 # --- raylib: system package when available, otherwise fetch and build ---

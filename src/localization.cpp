@@ -1,92 +1,53 @@
 #include "localization.h"
+#include "settings.h"
 
 #include <cstdio>
-#include <cstdlib>
-#include <cstring>
 
 namespace loc {
-namespace {
 
-Lang lang = Lang::EN;
-
-std::string PrefPath() {
-    std::string dir;
-    const char* xdg = getenv("XDG_CONFIG_HOME");
-    if (xdg && *xdg) dir = xdg;
-    else {
-        const char* home = getenv("HOME");
-        if (home && *home) dir = std::string(home) + "/.config";
-    }
-#ifdef _WIN32
-    if (dir.empty()) {
-        const char* appdata = getenv("APPDATA");
-        if (appdata && *appdata) dir = appdata;
-    }
-#endif
-    if (dir.empty()) return ""; // e.g. Android: session-only choice
-    return dir + "/bloodrush.lang";
-}
-
-void Save() {
-    std::string p = PrefPath();
-    if (p.empty()) return;
-    FILE* f = fopen(p.c_str(), "w");
-    if (f) {
-        fputs(lang == Lang::RU ? "ru" : "en", f);
-        fclose(f);
-    }
-}
-
-} // namespace
-
-Lang Get() { return lang; }
+Lang Get() { return settings::Get().lang == 1 ? Lang::RU : Lang::EN; }
 
 void Toggle() {
-    lang = lang == Lang::RU ? Lang::EN : Lang::RU;
-    Save();
+    settings::Get().lang = settings::Get().lang == 1 ? 0 : 1;
+    settings::Save();
 }
 
-void LoadPref() {
-    std::string p = PrefPath();
-    if (p.empty()) return;
-    FILE* f = fopen(p.c_str(), "r");
-    if (!f) return;
-    char buf[8] = {};
-    fread(buf, 1, sizeof(buf) - 1, f);
-    fclose(f);
-    if (strncmp(buf, "ru", 2) == 0) lang = Lang::RU;
-}
+void LoadPref() { /* storage moved to settings::Load() */ }
 
 const char* T(const char* en, const char* ru) {
-    return lang == Lang::RU ? ru : en;
+    return Get() == Lang::RU ? ru : en;
 }
 
 const char* LevelName(int level) {
-    if (lang == Lang::RU) {
+    if (Get() == Lang::RU) {
         switch (level) {
             case 2: return "КАТАКОМБЫ";
             case 3: return "АЛТАРЬ";
+            case 4: return "ПЕЧЬ";
+            case 5: return "ТРОН";
             default: return "ДВОР";
         }
     }
     switch (level) {
         case 2: return "THE CATACOMBS";
         case 3: return "THE ALTAR";
+        case 4: return "THE FURNACE";
+        case 5: return "THE THRONE";
         default: return "THE YARD";
     }
 }
 
 std::vector<std::string> IntroLines() {
-    if (lang == Lang::RU) return {
+    if (Get() == Lang::RU) return {
         "ЗЕМЛЯ МОЛЧИТ.",
-        "БОЕВАЯ МАШИНА V-13 ПРОБУЖДАЕТСЯ.",
+        "МАШИНА ПРОБУЖДАЕТСЯ.",
         "ТОПЛИВО: НОЛЬ.",
         "НАЙДЕН ИСТОЧНИК: КРОВЬ.",
         "БАШНЯ ЗОВЁТ. СПУСКАЙСЯ.",
     };
     return {
         "EARTH IS SILENT.",
-        "MACHINE UNIT V-13 REACTIVATES.",
+        "THE MACHINE REACTIVATES.",
         "FUEL RESERVES: EMPTY.",
         "ALTERNATIVE SOURCE LOCATED: BLOOD.",
         "THE TOWER CALLS. DESCEND.",
@@ -94,37 +55,65 @@ std::vector<std::string> IntroLines() {
 }
 
 std::vector<std::string> LevelLines(int level) {
-    if (lang == Lang::RU) {
-        if (level == 2) return {
-            "СЛОЙ ЗАЧИЩЕН.",
-            "ПОД ДВОРОМ: КАТАКОМБЫ.",
-            "МЁРТВЫЕ ЗДЕСЬ НЕ СПЯТ.",
-            "ОНИ ЗНАЮТ, ЧТО ТЫ ИДЁШЬ.",
+    if (Get() == Lang::RU) {
+        switch (level) {
+            case 2: return {
+                "СЛОЙ ЗАЧИЩЕН.",
+                "ПОД ДВОРОМ: КАТАКОМБЫ.",
+                "МЁРТВЫЕ ЗДЕСЬ НЕ СПЯТ.",
+                "ОНИ ЗНАЮТ, ЧТО ТЫ ИДЁШЬ.",
+            };
+            case 3: return {
+                "КАТАКОМБЫ ЗАТИХЛИ.",
+                "НИЖЕ: АЛТАРЬ.",
+                "ЗДЕСЬ МОЛИЛИСЬ НЕ ЛЮДИ.",
+                "ГЛУБЖЕ ЕСТЬ ЕЩЁ.",
+            };
+            case 4: return {
+                "АЛТАРЬ ОСЫПАЕТСЯ.",
+                "СНИЗУ ЖАР: ПЕЧЬ.",
+                "СТАЛЬ ПЛАВИТСЯ.",
+                "ТЫ — НЕТ.",
+            };
+            default: return {
+                "ПЕЧЬ УГАСАЕТ.",
+                "НА ДНЕ: ТРОН.",
+                "ХРАНИТЕЛЬ ЖДЁТ.",
+                "ЗАКОНЧИ ЭТО.",
+            };
+        }
+    }
+    switch (level) {
+        case 2: return {
+            "LAYER CLEARED.",
+            "BELOW THE YARD: THE CATACOMBS.",
+            "THE DEAD HERE DO NOT REST.",
+            "THEY KNOW YOU ARE COMING.",
         };
-        return {
-            "КАТАКОМБЫ ЗАТИХЛИ.",
-            "ОСТАЛСЯ ОДИН СЛОЙ: АЛТАРЬ.",
-            "ЕГО ХРАНИТ НЕЧТО ДРЕВНЕЕ.",
-            "ХРАНИТЕЛЬ ПРОСЫПАЕТСЯ.",
+        case 3: return {
+            "THE CATACOMBS FALL SILENT.",
+            "BELOW: THE ALTAR.",
+            "WHAT PRAYED HERE WAS NOT HUMAN.",
+            "THERE IS MORE BENEATH.",
+        };
+        case 4: return {
+            "THE ALTAR CRUMBLES.",
+            "HEAT RISES: THE FURNACE.",
+            "STEEL MELTS HERE.",
+            "YOU DO NOT.",
+        };
+        default: return {
+            "THE FURNACE DIES OUT.",
+            "AT THE BOTTOM: THE THRONE.",
+            "THE WARDEN IS WAITING.",
+            "END IT.",
         };
     }
-    if (level == 2) return {
-        "LAYER CLEARED.",
-        "BELOW THE YARD: THE CATACOMBS.",
-        "THE DEAD HERE DO NOT REST.",
-        "THEY KNOW YOU ARE COMING.",
-    };
-    return {
-        "THE CATACOMBS FALL SILENT.",
-        "ONE LAYER REMAINS: THE ALTAR.",
-        "SOMETHING ANCIENT GUARDS IT.",
-        "THE WARDEN STIRS.",
-    };
 }
 
 std::vector<std::string> VictoryLines(int nextLoop) {
     char buf[96];
-    if (lang == Lang::RU) {
+    if (Get() == Lang::RU) {
         snprintf(buf, sizeof(buf), "КРУГ %d. КРОМЕ НАСИЛИЯ НЕТ НИЧЕГО.", nextLoop + 1);
         return {
             "ХРАНИТЕЛЬ ПАЛ.",
