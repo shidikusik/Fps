@@ -442,77 +442,151 @@ void EnemyManager::Draw() const {
         switch (e.type) {
             case EnemyType::Husk: {
                 Color body = Mix({ 120, 26, 30, 255 }, WHITE, flash);
+                Color flesh = Mix({ 150, 40, 40, 255 }, WHITE, flash);
                 Color head = Mix({ 20, 14, 16, 255 }, WHITE, flash);
+                Color eye = Mix({ 255, 230, 0, 255 }, WHITE, flash);
                 float sway = sinf(e.animT * 1.6f) * 0.25f;
+                float hunch = 6.0f + sinf(e.animT * 0.8f) * 2.0f;
+                rlRotatef(hunch, 1, 0, 0); // hunched forward
+                // torso, torn open: dark wound with a glow inside
                 DrawCube({ 0, 0.05f, 0 }, 0.9f, 1.15f, 0.55f, body);
                 DrawCubeWires({ 0, 0.05f, 0 }, 0.9f, 1.15f, 0.55f, { 220, 30, 40, 255 });
-                DrawCube({ 0, 0.9f, 0 }, 0.45f, 0.45f, 0.45f, head);
-                DrawCube({ 0.1f, 0.92f, 0.23f }, 0.09f, 0.09f, 0.05f, { 255, 230, 0, 255 });
-                DrawCube({ -0.1f, 0.92f, 0.23f }, 0.09f, 0.09f, 0.05f, { 255, 230, 0, 255 });
-                DrawCube({ 0.55f, 0.15f, sway }, 0.2f, 0.8f, 0.2f, body);
-                DrawCube({ -0.55f, 0.15f, -sway }, 0.2f, 0.8f, 0.2f, body);
+                DrawCube({ 0.08f, 0.18f, 0.26f }, 0.34f, 0.5f, 0.06f, head);
+                DrawCube({ 0.08f, 0.18f, 0.28f }, 0.12f, 0.22f, 0.04f, eye);
+                // ribs hinted across the chest
+                for (int i = 0; i < 3; i++)
+                    DrawCube({ -0.22f, 0.35f - i * 0.18f, 0.27f }, 0.28f, 0.05f, 0.04f, flesh);
+                // sagging asymmetric shoulders
+                DrawCube({ 0.5f, 0.55f, 0 }, 0.28f, 0.22f, 0.3f, flesh);
+                DrawCube({ -0.52f, 0.62f, 0 }, 0.26f, 0.2f, 0.28f, flesh);
+                // skull, jaw, eyes
+                DrawCube({ 0, 0.9f, 0.05f }, 0.45f, 0.4f, 0.42f, head);
+                DrawCube({ 0, 0.72f, 0.14f }, 0.34f, 0.1f, 0.24f, flesh);
+                DrawCube({ 0.1f, 0.94f, 0.26f }, 0.09f, 0.09f, 0.05f, eye);
+                DrawCube({ -0.1f, 0.94f, 0.26f }, 0.09f, 0.09f, 0.05f, eye);
+                // long arms with claw tips
+                DrawCube({ 0.55f, 0.1f, 0.1f + sway }, 0.18f, 0.7f, 0.18f, body);
+                DrawCube({ -0.55f, 0.1f, 0.1f - sway }, 0.18f, 0.7f, 0.18f, body);
+                DrawCube({ 0.55f, -0.3f, 0.18f + sway }, 0.14f, 0.24f, 0.14f, head);
+                DrawCube({ -0.55f, -0.3f, 0.18f - sway }, 0.14f, 0.24f, 0.14f, head);
+                DrawCube({ 0.55f, -0.45f, 0.24f + sway }, 0.05f, 0.14f, 0.05f, eye);
+                DrawCube({ -0.55f, -0.45f, 0.24f - sway }, 0.05f, 0.14f, 0.05f, eye);
+                // legs
                 DrawCube({ 0.22f, -0.85f, sway * 0.7f }, 0.25f, 0.5f, 0.25f, head);
                 DrawCube({ -0.22f, -0.85f, -sway * 0.7f }, 0.25f, 0.5f, 0.25f, head);
                 break;
             }
             case EnemyType::Shooter: {
                 Color body = Mix({ 22, 16, 18, 255 }, WHITE, flash);
+                Color rim = Mix({ 230, 30, 40, 255 }, WHITE, flash);
                 rlPushMatrix();
                 rlRotatef(sinf(e.animT * 1.4f) * 8.0f, 0, 0, 1); // idle tilt
                 DrawCylinder({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, body);
-                DrawCylinderWires({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, { 230, 30, 40, 255 });
+                DrawCylinderWires({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, rim);
                 rlPushMatrix();
                 rlRotatef(180, 1, 0, 0);
                 DrawCylinder({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, body);
-                DrawCylinderWires({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, { 230, 30, 40, 255 });
+                DrawCylinderWires({ 0, 0, 0 }, 0.62f, 0.0f, 0.62f, 4, rim);
                 rlPopMatrix();
                 rlPopMatrix();
-                DrawSphere({ 0, 0, 0.45f }, 0.22f, Mix({ 255, 230, 0, 255 }, WHITE, flash));
-                DrawSphere({ 0, 0, 0.58f }, 0.09f, { 20, 14, 16, 255 });
+                // orbiting shard ring
+                for (int i = 0; i < 4; i++) {
+                    float a = e.animT * 1.8f + i * 1.5708f;
+                    DrawCube({ cosf(a) * 0.95f, sinf(e.animT * 2.6f + i) * 0.1f,
+                               sinf(a) * 0.95f }, 0.12f, 0.12f, 0.12f, rim);
+                }
+                // eye: socket, iris (heats up before firing), pupil
+                float chargeT = e.attackCd < 0.5f ? 1.0f - e.attackCd * 2.0f : 0.0f;
+                Color iris = Mix({ 255, 230, 0, 255 }, { 255, 90, 20, 255 }, chargeT);
+                DrawSphere({ 0, 0, 0.4f }, 0.26f, Mix({ 60, 40, 20, 255 }, WHITE, flash));
+                DrawSphere({ 0, 0, 0.48f }, 0.2f, Mix(iris, WHITE, flash));
+                DrawSphere({ 0, 0, 0.62f }, 0.08f, { 20, 14, 16, 255 });
                 break;
             }
             case EnemyType::Berserker: {
                 Color body = Mix({ 190, 20, 26, 255 }, WHITE, flash);
                 Color dark = Mix({ 30, 12, 14, 255 }, WHITE, flash);
+                Color gold = Mix({ 255, 230, 0, 255 }, WHITE, flash);
                 float lean = Clamp(Vector2Length({ e.vel.x, e.vel.z }) * 2.0f, 0.0f, 14.0f);
+                float pump = sinf(e.animT * 3.0f) * 0.05f;
                 rlRotatef(lean, 1, 0, 0);
+                // hulking torso with pauldrons and spine ridge
                 DrawCube({ 0, 0.1f, 0 }, 1.4f, 1.15f, 0.9f, body);
-                DrawCubeWires({ 0, 0.1f, 0 }, 1.4f, 1.15f, 0.9f, { 255, 230, 0, 255 });
+                DrawCubeWires({ 0, 0.1f, 0 }, 1.4f, 1.15f, 0.9f, gold);
+                DrawCube({ 0.72f, 0.62f, 0 }, 0.5f, 0.34f, 0.6f, dark);
+                DrawCube({ -0.72f, 0.62f, 0 }, 0.5f, 0.34f, 0.6f, dark);
+                DrawCube({ 0.72f, 0.84f, 0 }, 0.2f, 0.16f, 0.2f, gold);
+                DrawCube({ -0.72f, 0.84f, 0 }, 0.2f, 0.16f, 0.2f, gold);
+                for (int i = 0; i < 3; i++)
+                    DrawCube({ 0, 0.55f - i * 0.3f, -0.5f }, 0.14f, 0.16f, 0.14f, dark);
+                // armored head, eye strip, swept horns
                 DrawCube({ 0, 0.85f, 0.15f }, 0.55f, 0.4f, 0.5f, dark);
-                DrawCube({ 0, 0.85f, 0.42f }, 0.3f, 0.08f, 0.05f, { 255, 230, 0, 255 });
-                DrawCylinder({ 0.35f, 1.0f, 0 }, 0.12f, 0.0f, 0.45f, 4, dark);
-                DrawCylinder({ -0.35f, 1.0f, 0 }, 0.12f, 0.0f, 0.45f, 4, dark);
-                DrawCube({ 0.85f, -0.1f, 0.1f }, 0.35f, 0.9f, 0.35f, dark);
-                DrawCube({ -0.85f, -0.1f, 0.1f }, 0.35f, 0.9f, 0.35f, dark);
+                DrawCube({ 0, 0.85f, 0.42f }, 0.3f, 0.08f, 0.05f, gold);
+                rlNormal3f(0.3f, 0.8f, 0.5f);
+                DrawCylinderEx({ 0.3f, 1.0f, 0.1f }, { 0.55f, 1.28f, 0.42f },
+                               0.1f, 0.0f, 5, dark);
+                DrawCylinderEx({ -0.3f, 1.0f, 0.1f }, { -0.55f, 1.28f, 0.42f },
+                               0.1f, 0.0f, 5, dark);
+                // massive fists pumping while running
+                DrawCube({ 0.85f, -0.1f + pump, 0.1f }, 0.35f, 0.9f, 0.35f, dark);
+                DrawCube({ -0.85f, -0.1f - pump, 0.1f }, 0.35f, 0.9f, 0.35f, dark);
+                DrawCube({ 0.85f, -0.62f + pump, 0.16f }, 0.44f, 0.34f, 0.44f, body);
+                DrawCube({ -0.85f, -0.62f - pump, 0.16f }, 0.44f, 0.34f, 0.44f, body);
+                DrawCubeWires({ 0.85f, -0.62f + pump, 0.16f }, 0.44f, 0.34f, 0.44f, gold);
+                DrawCubeWires({ -0.85f, -0.62f - pump, 0.16f }, 0.44f, 0.34f, 0.44f, gold);
                 break;
             }
             case EnemyType::Warden: {
                 Color body = Mix({ 26, 12, 16, 255 }, WHITE, flash);
                 Color plate = Mix({ 120, 12, 20, 255 }, WHITE, flash);
                 Color gold = Mix({ 255, 220, 120, 255 }, WHITE, flash);
+                Color emberC = Mix({ 255, 90, 20, 255 }, WHITE, flash);
                 float lean = Clamp(Vector2Length({ e.vel.x, e.vel.z }) * 1.5f, 0.0f, 12.0f);
+                float breath = sinf(e.animT * 1.2f) * 0.04f;
                 rlRotatef(lean, 1, 0, 0);
+                // colossal body, layered chest armor with a glowing rune
                 DrawCube({ 0, 0.1f, 0 }, 3.0f, 2.6f, 2.0f, body);
                 DrawCubeWires({ 0, 0.1f, 0 }, 3.0f, 2.6f, 2.0f, { 230, 30, 40, 255 });
-                DrawCube({ 0, 0.3f, 0.9f }, 2.2f, 1.4f, 0.3f, plate);      // chest plate
-                DrawCube({ 0, 1.8f, 0.2f }, 1.1f, 0.9f, 1.0f, plate);      // head
-                DrawCube({ 0, 1.8f, 0.75f }, 0.8f, 0.15f, 0.1f, gold);     // visor
-                DrawCylinder({ 0.7f, 2.2f, 0 }, 0.22f, 0.0f, 0.9f, 4, gold);  // crown
-                DrawCylinder({ -0.7f, 2.2f, 0 }, 0.22f, 0.0f, 0.9f, 4, gold);
-                DrawCylinder({ 0, 2.3f, -0.3f }, 0.22f, 0.0f, 1.1f, 4, gold);
-                DrawCube({ 1.8f, -0.2f, 0.2f }, 0.7f, 2.0f, 0.7f, body);   // arms
+                DrawCube({ 0, 0.3f + breath, 0.9f }, 2.2f, 1.4f, 0.3f, plate);
+                DrawCube({ 0, 0.3f + breath, 1.05f }, 1.2f, 0.8f, 0.1f, body);
+                DrawCube({ 0, 0.4f + breath, 1.12f }, 0.18f, 0.6f, 0.06f, emberC);
+                DrawCube({ 0, 0.5f + breath, 1.12f }, 0.5f, 0.16f, 0.06f, emberC);
+                // waist cape slab behind
+                DrawCube({ 0, -0.7f, -0.9f }, 2.4f, 1.6f, 0.24f, plate);
+                DrawCubeWires({ 0, -0.7f, -0.9f }, 2.4f, 1.6f, 0.24f, gold);
+                // helmet with visor and jaw guard
+                DrawCube({ 0, 1.8f, 0.2f }, 1.1f, 0.9f, 1.0f, plate);
+                DrawCube({ 0, 1.7f, 0.72f }, 0.9f, 0.3f, 0.16f, body);
+                DrawCube({ 0, 1.9f, 0.75f }, 0.8f, 0.15f, 0.1f, gold);
+                // tall crown of blades
+                rlNormal3f(0.3f, 0.8f, 0.5f);
+                DrawCylinderEx({ 0.7f, 2.2f, 0 }, { 0.95f, 3.3f, 0 }, 0.16f, 0.0f, 5, gold);
+                DrawCylinderEx({ -0.7f, 2.2f, 0 }, { -0.95f, 3.3f, 0 }, 0.16f, 0.0f, 5, gold);
+                DrawCylinderEx({ 0.3f, 2.3f, -0.2f }, { 0.4f, 3.6f, -0.3f }, 0.14f, 0.0f, 5, gold);
+                DrawCylinderEx({ -0.3f, 2.3f, -0.2f }, { -0.4f, 3.6f, -0.3f }, 0.14f, 0.0f, 5, gold);
+                DrawCylinderEx({ 0, 2.35f, 0.1f }, { 0, 3.8f, 0.2f }, 0.18f, 0.0f, 5, gold);
+                // arms: pauldrons, gauntlet fists with ember knuckles
+                DrawCube({ 1.8f, -0.2f, 0.2f }, 0.7f, 2.0f, 0.7f, body);
                 DrawCube({ -1.8f, -0.2f, 0.2f }, 0.7f, 2.0f, 0.7f, body);
-                DrawCubeWires({ 1.8f, -0.2f, 0.2f }, 0.7f, 2.0f, 0.7f, { 230, 30, 40, 255 });
-                DrawCubeWires({ -1.8f, -0.2f, 0.2f }, 0.7f, 2.0f, 0.7f, { 230, 30, 40, 255 });
+                DrawCube({ 1.8f, 0.5f, 0.2f }, 0.85f, 0.5f, 0.85f, plate);
+                DrawCube({ -1.8f, 0.5f, 0.2f }, 0.85f, 0.5f, 0.85f, plate);
+                DrawCube({ 1.8f, -1.3f, 0.3f }, 0.8f, 0.6f, 0.8f, plate);
+                DrawCube({ -1.8f, -1.3f, 0.3f }, 0.8f, 0.6f, 0.8f, plate);
+                DrawCube({ 1.8f, -1.3f, 0.72f }, 0.5f, 0.3f, 0.1f, emberC);
+                DrawCube({ -1.8f, -1.3f, 0.72f }, 0.5f, 0.3f, 0.1f, emberC);
+                DrawCubeWires({ 1.8f, -1.3f, 0.3f }, 0.8f, 0.6f, 0.8f, gold);
+                DrawCubeWires({ -1.8f, -1.3f, 0.3f }, 0.8f, 0.6f, 0.8f, gold);
                 break;
             }
         }
         rlPopMatrix();
     }
 
+    // enemy projectiles: pulsing destructible orbs
     for (const EnemyShot& s : shots_) {
         if (!s.alive) continue;
-        DrawSphere(s.pos, SHOT_RADIUS, { 255, 230, 0, 255 });
-        DrawSphereWires(s.pos, SHOT_RADIUS + 0.06f, 4, 4, { 255, 160, 20, 255 });
+        float p = 1.0f + 0.15f * sinf(s.life * 12.0f);
+        DrawSphere(s.pos, SHOT_RADIUS * p, { 255, 230, 0, 255 });
+        DrawSphereWires(s.pos, (SHOT_RADIUS + 0.06f) * p, 4, 4, { 255, 160, 20, 255 });
     }
 }

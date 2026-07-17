@@ -9,8 +9,8 @@
 #include <cmath>
 
 namespace {
-constexpr float CHARS_PER_SEC = 30.0f;
-constexpr float LINE_HOLD = 1.3f;
+constexpr float CHARS_PER_SEC = 26.0f;
+constexpr float LINE_HOLD = 1.7f;
 }
 
 void Cutscene::Start(std::vector<std::string> lines, bool voiced) {

@@ -418,32 +418,48 @@ void Weapons::DrawViewmodel(const Player& pl) const {
     rlTranslatef(0, recoil_ * 0.03f, recoil_ * 0.13f);
     rlRotatef(recoil_ * 14, 1, 0, 0);
 
+    // A soft constant normal for cylinder parts (they emit none themselves)
+    rlNormal3f(0.35f, 0.8f, 0.45f);
     switch (current) {
         case WeaponType::Revolver: {
             Color barrelCol = GUN_DARK;
             if (charging_) barrelCol = Mix(GUN_DARK, { 230, 30, 40, 255 }, charge_);
-            DrawCube({ 0, 0.02f, -0.34f }, 0.055f, 0.075f, 0.42f, barrelCol);
-            DrawCube({ 0, 0.075f, -0.50f }, 0.02f, 0.035f, 0.03f, GUN_YELLOW);
-            DrawCube({ 0, 0.0f, -0.10f }, 0.08f, 0.115f, 0.18f, GUN_BLACK);
-            DrawCube({ 0, -0.10f, 0.02f }, 0.06f, 0.16f, 0.09f, GUN_RED);
-            DrawCube({ 0, -0.10f, 0.02f }, 0.075f, 0.06f, 0.105f, GUN_BLACK);
+            DrawCylinderEx({ 0, 0.02f, -0.13f }, { 0, 0.02f, -0.55f },
+                           0.032f, 0.028f, 8, barrelCol);              // barrel
+            DrawCube({ 0, 0.045f, -0.34f }, 0.02f, 0.04f, 0.4f, GUN_BLACK); // top strap
+            DrawCube({ 0, 0.075f, -0.50f }, 0.02f, 0.035f, 0.03f, GUN_YELLOW); // sight
+            DrawCylinderEx({ 0, 0.0f, -0.04f }, { 0, 0.0f, -0.17f },
+                           0.055f, 0.055f, 6, GUN_BLACK);              // cylinder drum
+            DrawCube({ 0, 0.0f, 0.02f }, 0.07f, 0.1f, 0.12f, GUN_DARK);   // frame
+            DrawCube({ 0, 0.06f, 0.07f }, 0.03f, 0.05f, 0.05f, GUN_BLACK); // hammer
+            DrawCube({ 0, -0.07f, 0.03f }, 0.05f, 0.05f, 0.09f, GUN_BLACK); // trigger guard
+            DrawCube({ 0, -0.12f, 0.05f }, 0.06f, 0.14f, 0.09f, GUN_RED);   // grip
+            DrawCube({ 0, -0.12f, 0.05f }, 0.075f, 0.06f, 0.105f, GUN_BLACK); // hand
+            DrawCube({ 0, -0.03f, 0.055f }, 0.062f, 0.012f, 0.012f, GUN_GOLD); // engraving
             break;
         }
         case WeaponType::Shotgun: {
-            DrawCube({ -0.025f, 0.02f, -0.42f }, 0.05f, 0.06f, 0.62f, GUN_DARK);
-            DrawCube({ 0.025f, 0.02f, -0.42f }, 0.05f, 0.06f, 0.62f, GUN_DARK);
-            DrawCube({ 0, 0.02f, -0.70f }, 0.115f, 0.075f, 0.06f, GUN_YELLOW);
-            DrawCube({ 0, -0.015f, -0.05f }, 0.11f, 0.13f, 0.3f, GUN_BLACK);
-            DrawCube({ 0, -0.11f, 0.10f }, 0.07f, 0.15f, 0.12f, GUN_RED);
-            DrawCube({ 0, -0.045f, -0.38f }, 0.09f, 0.07f, 0.14f, GUN_RED);
-            DrawCube({ 0, -0.045f, -0.38f }, 0.105f, 0.055f, 0.08f, GUN_BLACK);
-            DrawCube({ 0, -0.11f, 0.10f }, 0.085f, 0.06f, 0.135f, GUN_BLACK);
+            DrawCylinderEx({ -0.028f, 0.03f, -0.12f }, { -0.028f, 0.03f, -0.74f },
+                           0.028f, 0.026f, 8, GUN_DARK);               // twin barrels
+            DrawCylinderEx({ 0.028f, 0.03f, -0.12f }, { 0.028f, 0.03f, -0.74f },
+                           0.028f, 0.026f, 8, GUN_DARK);
+            DrawCube({ 0, 0.03f, -0.70f }, 0.115f, 0.075f, 0.05f, GUN_YELLOW); // muzzle band
+            DrawCube({ 0, 0.03f, -0.36f }, 0.1f, 0.05f, 0.05f, GUN_BLACK);     // mid band
+            DrawCube({ 0, -0.015f, -0.05f }, 0.11f, 0.13f, 0.3f, GUN_BLACK);   // receiver
+            DrawCube({ 0.04f, 0.02f, 0.02f }, 0.02f, 0.04f, 0.08f, GUN_DARK); // ejector
+            DrawCube({ 0, -0.11f, 0.10f }, 0.07f, 0.15f, 0.12f, GUN_RED);      // grip
+            DrawCube({ 0, -0.05f, -0.42f }, 0.09f, 0.07f, 0.16f, GUN_RED);     // pump
+            DrawCube({ 0, -0.05f, -0.42f }, 0.105f, 0.055f, 0.09f, GUN_BLACK); // fore hand
+            DrawCube({ 0, -0.11f, 0.10f }, 0.085f, 0.06f, 0.135f, GUN_BLACK);  // rear hand
             break;
         }
         case WeaponType::Nailgun: {
             DrawCube({ 0, -0.01f, -0.10f }, 0.12f, 0.14f, 0.34f, GUN_BLACK);   // body
+            DrawCube({ 0, 0.08f, -0.10f }, 0.06f, 0.04f, 0.3f, GUN_DARK);      // top rail
             DrawCube({ 0, -0.13f, 0.02f }, 0.06f, 0.14f, 0.09f, GUN_RED);      // grip
-            DrawCube({ 0, -0.12f, -0.22f }, 0.09f, 0.16f, 0.09f, GUN_DARK);    // mag
+            DrawCylinderEx({ 0.0f, -0.14f, -0.2f }, { 0.0f, -0.02f, -0.2f },
+                           0.07f, 0.07f, 8, GUN_DARK);                         // ammo drum
+            DrawCube({ 0.07f, -0.06f, -0.05f }, 0.02f, 0.02f, 0.24f, GUN_RED); // feed hose
             // rotating 4-barrel cluster
             rlPushMatrix();
             rlTranslatef(0, 0.0f, -0.42f);
@@ -451,21 +467,28 @@ void Weapons::DrawViewmodel(const Player& pl) const {
             for (int i = 0; i < 4; i++) {
                 rlPushMatrix();
                 rlRotatef(90.0f * i, 0, 0, 1);
-                DrawCube({ 0.045f, 0, 0 }, 0.035f, 0.035f, 0.34f, GUN_DARK);
+                DrawCylinderEx({ 0.045f, 0, 0.17f }, { 0.045f, 0, -0.17f },
+                               0.018f, 0.018f, 6, GUN_DARK);
                 rlPopMatrix();
             }
             rlPopMatrix();
-            DrawCube({ 0, 0, -0.60f }, 0.13f, 0.13f, 0.04f, GUN_YELLOW);       // muzzle ring
+            DrawCylinderEx({ 0, 0, -0.58f }, { 0, 0, -0.62f },
+                           0.075f, 0.07f, 8, GUN_YELLOW);                      // muzzle ring
             break;
         }
         case WeaponType::Railcannon: {
             float ready = 1.0f - Clamp(cd_ / RAIL_CD, 0.0f, 1.0f);
             Color coil = Mix(GUN_DARK, GUN_GOLD, ready);
-            DrawCube({ 0, 0.0f, -0.30f }, 0.09f, 0.11f, 0.85f, GUN_BLACK);     // rail body
+            DrawCube({ 0, 0.0f, -0.30f }, 0.08f, 0.1f, 0.85f, GUN_BLACK);      // rail body
+            DrawCube({ 0, 0.07f, -0.3f }, 0.03f, 0.03f, 0.7f, coil);           // charge strip
             DrawCube({ 0, -0.12f, 0.05f }, 0.06f, 0.15f, 0.1f, GUN_RED);       // grip
-            for (int i = 0; i < 3; i++)                                        // coils
-                DrawCube({ 0, 0.0f, -0.18f - 0.2f * i }, 0.15f, 0.15f, 0.05f, coil);
-            DrawCube({ 0, 0.0f, -0.74f }, 0.05f, 0.05f, 0.1f, coil);           // emitter
+            for (int i = 0; i < 4; i++)                                        // coil rings
+                DrawCylinderEx({ 0, 0.0f, -0.14f - 0.17f * i },
+                               { 0, 0.0f, -0.19f - 0.17f * i },
+                               0.085f, 0.085f, 8, coil);
+            DrawCube({ 0.06f, -0.05f, -0.3f }, 0.02f, 0.02f, 0.5f, GUN_RED);   // cable
+            DrawCylinderEx({ 0, 0, -0.72f }, { 0, 0, -0.8f },
+                           0.03f, 0.02f, 8, coil);                             // emitter
             break;
         }
     }
