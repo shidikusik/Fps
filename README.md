@@ -165,11 +165,12 @@ app menu without any Flatpak.
 | RMB (hold) | revolver charged shot — pierces everything |
 | 1–4 / wheel | switch weapons |
 | ENTER / click | start, skip cutscenes, retry |
-| S (in menu) | settings: language, sensitivity, volume (clickable button too) |
+| S (in menu) | settings: language, sensitivity, volume, vibration, controls |
+| Gamepad | full support (DualShock 4 first-class): left stick move, right stick look, sticks + face/trigger buttons all rebindable |
 | ESC | pause |
 | F11 | fullscreen |
 
-Settings (language / look sensitivity / master volume) are clickable —
+Settings (language / sensitivity / volume / vibration) are clickable —
 handy on Android — and persist in `~/.config/bloodrush.cfg`. The language
 covers menu, HUD, cutscenes and touch labels (style popups stay English
 by design). Cyrillic is rendered by an embedded
@@ -177,6 +178,19 @@ Press Start 2P pixel font (OFL) — still zero asset files.
 
 On Android everything maps to the touch UI; on desktop you can preview it
 with `BLOODRUSH_TOUCH=1 ./bloodrush`.
+
+**Gamepads** work in every version of the game (Linux, Windows, Android
+via USB/Bluetooth). DualShock 4 is first-class: left stick moves, right
+stick aims, CROSS jumps, L1 dashes, R1 slides/slams, R2 fires, L2 alt-fire,
+SQUARE cycles weapons, OPTIONS pauses. **Rumble** is supported — Linux via
+kernel force-feedback, Windows via XInput — and can be toggled in Settings.
+Every action (keyboard, mouse and gamepad) is **rebindable** in
+Settings → Controls, saved to `~/.config/bloodrush.binds`.
+
+**Progress is saved** at the entrance of every layer (and every NG+ loop),
+so you can quit anytime and pick **CONTINUE** from the menu to resume from
+the last layer. Dying ends the run and clears the checkpoint. Saved to
+`~/.config/bloodrush.save`.
 
 ## Combat
 

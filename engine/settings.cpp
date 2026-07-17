@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "rumble.h"
 #include "raylib.h"
 
 #include <cstdio>
@@ -7,11 +8,8 @@
 #include <string>
 
 namespace settings {
-namespace {
 
-Values values;
-
-std::string Path() {
+std::string ConfigDir() {
     std::string dir;
     const char* xdg = getenv("XDG_CONFIG_HOME");
     if (xdg && *xdg) dir = xdg;
@@ -25,7 +23,16 @@ std::string Path() {
         if (appdata && *appdata) dir = appdata;
     }
 #endif
-    if (dir.empty()) return ""; // e.g. Android: session-only settings
+    return dir; // "" e.g. on Android: session-only settings
+}
+
+namespace {
+
+Values values;
+
+std::string Path() {
+    std::string dir = ConfigDir();
+    if (dir.empty()) return "";
     return dir + "/bloodrush.cfg";
 }
 
@@ -42,8 +49,9 @@ void Save() {
     if (p.empty()) return;
     FILE* f = fopen(p.c_str(), "w");
     if (!f) return;
-    fprintf(f, "lang=%s\nsens=%.2f\nvol=%.2f\n",
-            values.lang == 1 ? "ru" : "en", values.sensitivity, values.volume);
+    fprintf(f, "lang=%s\nsens=%.2f\nvol=%.2f\nvib=%d\n",
+            values.lang == 1 ? "ru" : "en", values.sensitivity, values.volume,
+            values.vibration ? 1 : 0);
     fclose(f);
 }
 
@@ -60,11 +68,14 @@ void Load() {
                     values.sensitivity = ClampF((float)atof(line + 5), 0.4f, 2.0f);
                 else if (strncmp(line, "vol=", 4) == 0)
                     values.volume = ClampF((float)atof(line + 4), 0.0f, 1.0f);
+                else if (strncmp(line, "vib=", 4) == 0)
+                    values.vibration = line[4] != '0';
             }
             fclose(f);
         }
     }
     ApplyVolume();
+    rumble::SetEnabled(values.vibration);
 }
 
 } // namespace settings

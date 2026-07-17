@@ -6,6 +6,7 @@
 #include "rlgl.h"
 
 #include "arena.h"
+#include "bindings.h"
 #include "bloodengine.h"
 #include "config.h"
 #include "cutscene.h"
@@ -14,6 +15,8 @@
 #include "machine.h"
 #include "particles.h"
 #include "player.h"
+#include "rumble.h"
+#include "savegame.h"
 #include "settings.h"
 #include "shading.h"
 #include "splash.h"
@@ -38,8 +41,15 @@ constexpr Color HUD_YELLOW = { 255, 230, 0, 255 };
 constexpr Color HUD_WHITE  = { 235, 230, 230, 255 };
 constexpr Color HUD_DIM    = { 120, 60, 64, 255 };
 
-enum class GameState { Splash, Menu, Settings, Cutscene, Playing, Paused, Dead };
+enum class GameState { Splash, Menu, Settings, Controls, Cutscene, Playing, Paused, Dead };
 enum class AfterCutscene { BeginRun, ResumePlay };
+
+bool PadConfirmPressed() {
+    return binds::PadActive() &&
+           IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+}
+
+float Dead(float v) { return fabsf(v) < 0.18f ? 0.0f : v; }
 
 Rectangle SettingsButtonRect() {
     const char* label = loc::T("SETTINGS [S]", "НАСТРОЙКИ [S]");
@@ -49,21 +59,25 @@ Rectangle SettingsButtonRect() {
 
 // --- settings screen: rows of clickable controls ---
 struct SettingsRects {
-    Rectangle lang, sensMinus, sensPlus, volMinus, volPlus, back;
+    Rectangle lang, sensMinus, sensPlus, volMinus, volPlus, vib, controls, back;
 };
 
 SettingsRects GetSettingsRects() {
     const float W = (float)cfg::RENDER_W;
     SettingsRects r;
-    float y = 250;
+    float y = 215;
     r.lang = { W / 2 + 40, y - 6, 260, 36 };
-    y += 80;
+    y += 68;
     r.sensMinus = { W / 2 + 40, y - 6, 48, 36 };
     r.sensPlus = { W / 2 + 220, y - 6, 48, 36 };
-    y += 80;
+    y += 68;
     r.volMinus = { W / 2 + 40, y - 6, 48, 36 };
     r.volPlus = { W / 2 + 220, y - 6, 48, 36 };
-    r.back = { W / 2 - 90, 520, 180, 44 };
+    y += 68;
+    r.vib = { W / 2 + 40, y - 6, 260, 36 };
+    y += 68;
+    r.controls = { W / 2 - 170, y + 10, 340, 44 };
+    r.back = { W / 2 - 90, y + 74, 180, 44 };
     return r;
 }
 
@@ -101,15 +115,23 @@ void DrawSettingsScreen() {
     ui::Text(buf, W / 2 + 130 - ui::Measure(buf, 18) / 2, (int)r.volMinus.y + 10, 18, white);
     DrawButton(r.volPlus, "+", 18, yellow);
 
+    ui::Text(loc::T("VIBRATION", "ВИБРАЦИЯ"), W / 2 - 340, (int)r.vib.y + 10, 18, white);
+    DrawButton(r.vib, v.vibration ? loc::T("ON", "ВКЛ") : loc::T("OFF", "ВЫКЛ"), 16, yellow);
+
+    DrawButton(r.controls, loc::T("CONTROLS...", "УПРАВЛЕНИЕ..."), 18, yellow);
     DrawButton(r.back, loc::T("BACK", "НАЗАД"), 18, white);
+
+    if (binds::PadActive())
+        ui::TextCentered(loc::T("GAMEPAD CONNECTED", "ГЕЙМПАД ПОДКЛЮЧЁН"),
+                         H - 40, 14, { 255, 220, 120, 255 });
 }
 
-// returns true if the settings screen should close
-bool UpdateSettingsScreen(Vector2 mp) {
+// 0 = stay, 1 = back to menu, 2 = open controls screen
+int UpdateSettingsScreen(Vector2 mp) {
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_Q) ||
-        IsKeyPressed(KEY_BACK)) return true;
+        IsKeyPressed(KEY_BACK)) return 1;
     if (IsKeyPressed(KEY_L)) { loc::Toggle(); sfx::Play(sfx::CLICK, 0.6f); }
-    if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return false;
+    if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return 0;
 
     SettingsRects r = GetSettingsRects();
     settings::Values& v = settings::Get();
@@ -119,39 +141,139 @@ bool UpdateSettingsScreen(Vector2 mp) {
     else if (CheckCollisionPointRec(mp, r.sensPlus)) { v.sensitivity = fminf(2.0f, v.sensitivity + 0.1f); changed = true; }
     else if (CheckCollisionPointRec(mp, r.volMinus)) { v.volume = fmaxf(0.0f, v.volume - 0.1f); settings::ApplyVolume(); changed = true; }
     else if (CheckCollisionPointRec(mp, r.volPlus)) { v.volume = fminf(1.0f, v.volume + 0.1f); settings::ApplyVolume(); changed = true; }
-    else if (CheckCollisionPointRec(mp, r.back)) return true;
+    else if (CheckCollisionPointRec(mp, r.vib)) {
+        v.vibration = !v.vibration;
+        rumble::SetEnabled(v.vibration);
+        if (v.vibration) rumble::Pulse(0.6f, 0.6f, 200);
+        changed = true;
+    }
+    else if (CheckCollisionPointRec(mp, r.controls)) return 2;
+    else if (CheckCollisionPointRec(mp, r.back)) return 1;
     if (changed) {
         settings::Save();
         sfx::Play(sfx::CLICK, 0.6f);
     }
+    return 0;
+}
+
+// --- controls (rebinding) screen ---
+int captureAction = -1;   // action being rebound
+int captureSlot = 0;      // 0 = keyboard/mouse, 1 = gamepad
+
+Rectangle BindRect(int row, int slot) {
+    const float W = (float)cfg::RENDER_W;
+    return { W / 2 + (slot == 0 ? 10.0f : 210.0f), 150.0f + row * 44 - 4, 180, 34 };
+}
+
+void DrawControlsScreen() {
+    const int W = cfg::RENDER_W, H = cfg::RENDER_H;
+    DrawRectangle(0, 0, W, H, { 8, 4, 6, 210 });
+    ui::TextCentered(loc::T("CONTROLS", "УПРАВЛЕНИЕ"), 70, 34, { 230, 30, 40, 255 });
+    Color white = { 235, 230, 230, 255 };
+    Color yellow = { 255, 230, 0, 255 };
+    Color dim = { 120, 60, 64, 255 };
+
+    ui::Text(loc::T("KEY/MOUSE", "КЛАВИША"), W / 2 + 10, 120, 14, dim);
+    ui::Text(loc::T("GAMEPAD", "ГЕЙМПАД"), W / 2 + 210, 120, 14, dim);
+
+    bool ru = loc::Get() == Lang::RU;
+    for (int a = 0; a < binds::A_COUNT; a++) {
+        ui::Text(binds::ActionName((binds::Action)a, ru), W / 2 - 380,
+                 150 + a * 44, 16, white);
+        const binds::Binding& b = binds::Get((binds::Action)a);
+        bool capK = captureAction == a && captureSlot == 0;
+        bool capP = captureAction == a && captureSlot == 1;
+        DrawButton(BindRect(a, 0), capK ? "..." : binds::KeyLabel(b), 14,
+                   capK ? yellow : white);
+        DrawButton(BindRect(a, 1), capP ? "..." : binds::PadLabel(b), 14,
+                   capP ? yellow : white);
+    }
+    DrawButton({ (float)W / 2 - 290, (float)H - 70, 260, 40 },
+               loc::T("RESET DEFAULTS", "СБРОСИТЬ"), 14, dim);
+    DrawButton({ (float)W / 2 + 60, (float)H - 70, 200, 40 },
+               loc::T("BACK", "НАЗАД"), 16, white);
+    if (captureAction >= 0)
+        ui::TextCentered(loc::T("PRESS A KEY / BUTTON (ESC — CANCEL)",
+                                "НАЖМИТЕ КЛАВИШУ / КНОПКУ (ESC — ОТМЕНА)"),
+                         H - 110, 14, yellow);
+}
+
+// returns true when the screen should close
+bool UpdateControlsScreen(Vector2 mp) {
+    const int W = cfg::RENDER_W, H = cfg::RENDER_H;
+
+    if (captureAction >= 0) {
+        if (IsKeyPressed(KEY_ESCAPE)) { captureAction = -1; return false; }
+        binds::Binding& b = binds::Get((binds::Action)captureAction);
+        if (captureSlot == 0) {
+            int k = GetKeyPressed();
+            if (k > 0) { b.key = k; b.mouse = -1; captureAction = -1; binds::Save(); sfx::Play(sfx::CLICK, 0.6f); return false; }
+            for (int m = 0; m <= 2; m++)
+                if (IsMouseButtonPressed(m)) { b.mouse = m; b.key = -1; captureAction = -1; binds::Save(); sfx::Play(sfx::CLICK, 0.6f); return false; }
+        } else if (binds::PadActive()) {
+            for (int g = 1; g <= 17; g++)
+                if (IsGamepadButtonPressed(0, g)) { b.pad = g; captureAction = -1; binds::Save(); sfx::Play(sfx::CLICK, 0.6f); return false; }
+        }
+        return false;
+    }
+
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACK)) return true;
+    if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return false;
+    for (int a = 0; a < binds::A_COUNT; a++) {
+        if (CheckCollisionPointRec(mp, BindRect(a, 0))) { captureAction = a; captureSlot = 0; return false; }
+        if (CheckCollisionPointRec(mp, BindRect(a, 1))) { captureAction = a; captureSlot = 1; return false; }
+    }
+    if (CheckCollisionPointRec(mp, { (float)W / 2 - 290, (float)H - 70, 260, 40 })) {
+        binds::ResetDefaults();
+        binds::Save();
+        sfx::Play(sfx::CLICK, 0.6f);
+        return false;
+    }
+    if (CheckCollisionPointRec(mp, { (float)W / 2 + 60, (float)H - 70, 200, 40 }))
+        return true;
     return false;
 }
 
-PlayerInput GatherInput() {
+PlayerInput GatherInput(float dt) {
     PlayerInput in;
     Vector2 md = GetMouseDelta();
     in.mouseDx = md.x;
     in.mouseDy = md.y;
-    in.fwd  = (IsKeyDown(KEY_W) ? 1.0f : 0.0f) - (IsKeyDown(KEY_S) ? 1.0f : 0.0f);
-    in.side = (IsKeyDown(KEY_D) ? 1.0f : 0.0f) - (IsKeyDown(KEY_A) ? 1.0f : 0.0f);
-    in.jumpPressed  = IsKeyPressed(KEY_SPACE);
-    in.jumpHeld     = IsKeyDown(KEY_SPACE);
-    in.dashPressed  = IsKeyPressed(KEY_LEFT_SHIFT) || IsKeyPressed(KEY_RIGHT_SHIFT);
-    in.crouchPressed= IsKeyPressed(KEY_LEFT_CONTROL) || IsKeyPressed(KEY_RIGHT_CONTROL);
-    in.crouchHeld   = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+    in.fwd  = (binds::Down(binds::A_FWD) ? 1.0f : 0.0f) -
+              (binds::Down(binds::A_BACK) ? 1.0f : 0.0f);
+    in.side = (binds::Down(binds::A_RIGHT) ? 1.0f : 0.0f) -
+              (binds::Down(binds::A_LEFT) ? 1.0f : 0.0f);
+    in.jumpPressed  = binds::Pressed(binds::A_JUMP);
+    in.jumpHeld     = binds::Down(binds::A_JUMP);
+    in.dashPressed  = binds::Pressed(binds::A_DASH);
+    in.crouchPressed= binds::Pressed(binds::A_CROUCH);
+    in.crouchHeld   = binds::Down(binds::A_CROUCH);
+
+    if (binds::PadActive()) {
+        // left stick: movement; right stick: look (deadzone + dt scaling)
+        in.side += Dead(GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X));
+        in.fwd  -= Dead(GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y));
+        in.side = Clamp(in.side, -1.0f, 1.0f);
+        in.fwd = Clamp(in.fwd, -1.0f, 1.0f);
+        float rx = Dead(GetGamepadAxisMovement(0, GAMEPAD_AXIS_RIGHT_X));
+        float ry = Dead(GetGamepadAxisMovement(0, GAMEPAD_AXIS_RIGHT_Y));
+        in.mouseDx += rx * fabsf(rx) * 2600.0f * dt;  // squared response curve
+        in.mouseDy += ry * fabsf(ry) * 1800.0f * dt;
+    }
     return in;
 }
 
 CombatInput GatherCombatInput(const PlayerInput& pin) {
     CombatInput in;
-    in.fireHeld = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    in.altHeld = IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
+    in.fireHeld = binds::Down(binds::A_FIRE);
+    in.altHeld = binds::Down(binds::A_ALT);
     if (IsKeyPressed(KEY_ONE)) in.select = 0;
     if (IsKeyPressed(KEY_TWO)) in.select = 1;
     if (IsKeyPressed(KEY_THREE)) in.select = 2;
     if (IsKeyPressed(KEY_FOUR)) in.select = 3;
     float wheel = GetMouseWheelMove();
     in.cycle = wheel > 0 ? 1 : (wheel < 0 ? -1 : 0);
+    if (binds::Pressed(binds::A_WPN_NEXT)) in.cycle = 1;
     in.lookDx = pin.mouseDx;
     in.lookDy = pin.mouseDy;
     return in;
@@ -258,16 +380,29 @@ void DrawGameHud(const Player& player, const EnemyManager& enemies,
     DrawFPS(8, H - 26);
 }
 
-void DrawMenu() {
+void DrawMenu(bool hasSave, const save::Data& sv) {
     const int W = cfg::RENDER_W, H = cfg::RENDER_H;
     DrawRectangle(0, 0, W, H, { 8, 4, 6, 140 });
     DrawCenteredText("BLOODRUSH", H / 2 - 160, 72, HUD_RED);
     DrawCenteredText(loc::T("YOU ARE THE MACHINE. BLOOD IS FUEL.",
                             "ТЫ — МАШИНА. КРОВЬ — ТОПЛИВО."),
                      H / 2 - 72, 16, HUD_DIM);
-    if (fmodf((float)GetTime() * 1.6f, 1.0f) > 0.35f)
-        DrawCenteredText(loc::T("CLICK OR ENTER TO START", "КЛИК ИЛИ ENTER — СТАРТ"),
-                         H / 2 - 14, 24, HUD_YELLOW);
+    if (fmodf((float)GetTime() * 1.6f, 1.0f) > 0.35f) {
+        if (hasSave) {
+            char buf[96];
+            snprintf(buf, sizeof(buf),
+                     loc::T("ENTER — CONTINUE (%s, LOOP %d)",
+                            "ENTER — ПРОДОЛЖИТЬ (%s, КРУГ %d)"),
+                     story::LevelName(sv.level), sv.loop + 1);
+            DrawCenteredText(buf, H / 2 - 16, 20, HUD_YELLOW);
+            DrawCenteredText(loc::T("N — NEW GAME", "N — НОВАЯ ИГРА"),
+                             H / 2 + 12, 16, HUD_DIM);
+        } else {
+            DrawCenteredText(loc::T("CLICK OR ENTER TO START",
+                                    "КЛИК ИЛИ ENTER — СТАРТ"),
+                             H / 2 - 14, 24, HUD_YELLOW);
+        }
+    }
 
     const char* linesEn[] = {
         "WASD + mouse  move    SPACE hold  bunny hop",
@@ -303,6 +438,9 @@ void DrawPauseOverlay() {
     DrawCenteredText(loc::T("ESC / CLICK — resume        Q — menu",
                             "ESC / КЛИК — продолжить        Q — меню"),
                      H / 2 + 20, 15, HUD_WHITE);
+    DrawCenteredText(loc::T("progress saved at each layer — quit anytime",
+                            "прогресс сохраняется на входе в слой — можно выйти"),
+                     H / 2 + 52, 13, HUD_DIM);
 }
 
 void DrawDeathOverlay(const EnemyManager& enemies, const StyleMeter& style,
@@ -347,6 +485,8 @@ Camera3D CinematicCamera(float t01, int level) {
 int main() {
     be::Init(1280, 720, "BLOODRUSH");
     voice::Init();
+    rumble::Init();
+    binds::Load();
 
     RenderTexture2D target = LoadRenderTexture(cfg::RENDER_W, cfg::RENDER_H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
@@ -366,20 +506,55 @@ int main() {
     Cutscene cutscene;
     AfterCutscene afterCutscene = AfterCutscene::BeginRun;
 
-    auto resetRun = [&]() {
-        arena.Init(1);
+    // Writes a checkpoint at the entrance of a level so the player can quit
+    // and CONTINUE later.
+    auto checkpoint = [&](int level, int loop) {
+        save::Data d;
+        d.level = level;
+        d.loop = loop;
+        d.score = style.score;
+        d.hp = player.hp;
+        d.weapon = (int)weapons.current;
+        save::Write(d);
+    };
+
+    // Sets up a level; hp<0 = full. Fresh weapons unless restoring.
+    auto beginLevel = [&](int level, int loop, float hp, int weapon) {
+        arena.Init(level);
         player.Init(arena.SpawnPoint());
-        enemies.BeginLevel(1, 0);
+        if (hp > 0) player.hp = fminf(hp, player.maxHp);
+        enemies.BeginLevel(level, loop);
         particles.Reset();
-        style.Reset();
         weapons.Reset();
+        weapons.current = (WeaponType)Clamp(weapon, 0, NUM_WEAPONS - 1);
+    };
+
+    auto newGame = [&]() {
+        style.Reset();
+        beginLevel(1, 0, -1, 0);
+        checkpoint(1, 0);
+    };
+
+    save::Data pending;
+    bool hasSave = save::Read(pending);
+
+    auto continueGame = [&]() {
+        style.Reset();
+        style.score = pending.score;
+        beginLevel(pending.level, pending.loop, pending.hp, pending.weapon);
     };
 
     GameState state = GameState::Splash;
+    if (const char* sc = getenv("BLOODRUSH_SCREEN")) {
+        if (std::string(sc) == "controls") state = GameState::Controls;
+    }
     Splash splash;
     splash.Start();
     float shakeTime = 0;
     float legAnim = 0;
+    float rescanTimer = 0;
+    float prevHp = 100;
+    bool dashWasIdle = true;
     bool quit = false;
     const bool autoAim = getenv("BLOODRUSH_AUTOTEST") != nullptr;
 #ifdef __ANDROID__
@@ -392,6 +567,10 @@ int main() {
     while (!WindowShouldClose() && !quit) {
         float dt = fminf(GetFrameTime(), cfg::MAX_DT);
         if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
+
+        rumble::Update();
+        rescanTimer += dt;
+        if (rescanTimer > 2.0f) { rescanTimer = 0; rumble::Rescan(); }
 
         // letterbox mapping for this frame (used by touch input + final blit)
         RenderMap map;
@@ -429,9 +608,20 @@ int main() {
                     loc::Toggle();
                     sfx::Play(sfx::CLICK, 0.6f);
                 }
-                if ((IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !uiClicked) ||
-                    IsKeyPressed(KEY_ENTER)) {
-                    resetRun();
+                bool startNew = IsKeyPressed(KEY_N) ||
+                    (!hasSave && ((IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !uiClicked) ||
+                                  IsKeyPressed(KEY_ENTER) || PadConfirmPressed()));
+                bool doContinue = hasSave &&
+                    ((IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !uiClicked) ||
+                     IsKeyPressed(KEY_ENTER) || PadConfirmPressed());
+                if (doContinue) {
+                    continueGame();
+                    state = GameState::Playing;
+                    DisableCursor();
+                    sfx::Play(sfx::CLICK);
+                } else if (startNew) {
+                    newGame();
+                    hasSave = true;
                     cutscene.Start(story::IntroLines(), voice::PlayIntroLine); // voiced
                     afterCutscene = AfterCutscene::BeginRun;
                     state = GameState::Cutscene;
@@ -441,9 +631,16 @@ int main() {
                 break;
             }
 
-            case GameState::Settings:
-                if (UpdateSettingsScreen(map.ToRender(GetMousePosition())))
-                    state = GameState::Menu;
+            case GameState::Settings: {
+                int r = UpdateSettingsScreen(map.ToRender(GetMousePosition()));
+                if (r == 1) state = GameState::Menu;
+                else if (r == 2) { captureAction = -1; state = GameState::Controls; }
+                break;
+            }
+
+            case GameState::Controls:
+                if (UpdateControlsScreen(map.ToRender(GetMousePosition())))
+                    state = GameState::Settings;
                 break;
 
             case GameState::Cutscene:
@@ -463,13 +660,14 @@ int main() {
                 PlayerInput in;
                 CombatInput cin;
                 bool pausePressed = IsKeyPressed(KEY_ESCAPE) ||
-                                    IsKeyPressed(KEY_BACK);
+                                    IsKeyPressed(KEY_BACK) ||
+                                    binds::Pressed(binds::A_PAUSE);
                 if (touchUI) {
                     bool touchPause = false;
                     touch.Gather(map, in, cin, touchPause);
                     pausePressed = pausePressed || touchPause;
                 } else {
-                    in = GatherInput();
+                    in = GatherInput(dt);
                     cin = GatherCombatInput(in);
                 }
                 if (pausePressed) {
@@ -498,6 +696,13 @@ int main() {
                 style.Update(dt);
                 shakeTime += dt * 40.0f;
 
+                // --- haptics: hurt, slam landing, dash ---
+                if (player.hp < prevHp - 0.5f) rumble::Pulse(0.45f, 0.75f, 170);
+                if (player.slamLandedThisFrame) rumble::Pulse(0.9f, 0.6f, 230);
+                if (player.dashing && dashWasIdle) rumble::Pulse(0.25f, 0.5f, 90);
+                dashWasIdle = !player.dashing;
+                prevHp = player.hp;
+
                 // level progression
                 if (enemies.levelCleared) {
                     if (arena.Level() < Arena::NUM_LEVELS) {
@@ -508,6 +713,8 @@ int main() {
                         player.vel = { 0, 0, 0 };
                         player.Heal(50);
                         particles.Reset();
+                        checkpoint(next, enemies.loop);
+                        prevHp = player.hp;
                         cutscene.Start(story::LevelLines(next));
                     } else {
                         // Warden down: victory, then loop deeper
@@ -519,6 +726,8 @@ int main() {
                         player.vel = { 0, 0, 0 };
                         player.hp = player.maxHp;
                         particles.Reset();
+                        checkpoint(1, nextLoop);
+                        prevHp = player.hp;
                         cutscene.Start(story::VictoryLines(enemies.loop));
                     }
                     afterCutscene = AfterCutscene::ResumePlay;
@@ -530,6 +739,9 @@ int main() {
                 if (player.Dead()) {
                     state = GameState::Dead;
                     player.AddTrauma(1.0f);
+                    rumble::Pulse(1.0f, 1.0f, 400);
+                    save::Clear();       // the run is over
+                    hasSave = false;
                     EnableCursor();
                 }
                 break;
@@ -537,17 +749,20 @@ int main() {
 
             case GameState::Paused:
                 if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_ENTER) ||
-                    IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || PadConfirmPressed()) {
                     state = GameState::Playing;
                     DisableCursor();
                 }
-                if (IsKeyPressed(KEY_Q)) state = GameState::Menu;
+                if (IsKeyPressed(KEY_Q)) state = GameState::Menu; // saved at checkpoint
                 break;
 
             case GameState::Dead:
                 particles.Update(dt);
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER)) {
-                    resetRun();
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER) ||
+                    PadConfirmPressed()) {
+                    newGame();
+                    hasSave = true;
+                    prevHp = player.hp;
                     state = GameState::Playing;
                     DisableCursor();
                 }
@@ -558,7 +773,8 @@ int main() {
 
         // Camera
         Camera3D cam;
-        if (state == GameState::Menu || state == GameState::Settings) {
+        if (state == GameState::Menu || state == GameState::Settings ||
+            state == GameState::Controls) {
             cam = CinematicCamera(fmodf((float)GetTime() * 0.02f, 1.0f), arena.Level());
         } else if (state == GameState::Cutscene) {
             cam = CinematicCamera(cutscene.Progress(), arena.Level());
@@ -593,7 +809,7 @@ int main() {
         particles.Draw();
         // THE MACHINE: showcase in front of the menu camera, legs in-game
         if (state == GameState::Menu || state == GameState::Settings ||
-            state == GameState::Cutscene) {
+            state == GameState::Controls || state == GameState::Cutscene) {
             Vector3 dir = Vector3Normalize(Vector3Subtract(cam.target, cam.position));
             Vector3 right = Vector3Normalize(Vector3CrossProduct(dir, { 0, 1, 0 }));
             float side = state == GameState::Cutscene ? 0.0f : 4.6f;
@@ -636,8 +852,9 @@ int main() {
             if (touchUI && state == GameState::Playing) touch.Draw();
         }
 
-        if (state == GameState::Menu) DrawMenu();
+        if (state == GameState::Menu) DrawMenu(hasSave, pending);
         else if (state == GameState::Settings) DrawSettingsScreen();
+        else if (state == GameState::Controls) DrawControlsScreen();
         else if (state == GameState::Cutscene) cutscene.Draw();
         else if (state == GameState::Paused) DrawPauseOverlay();
         else if (state == GameState::Dead) DrawDeathOverlay(enemies, style, arena);
@@ -655,6 +872,7 @@ int main() {
 
     UnloadShader(shading);
     UnloadRenderTexture(target);
+    rumble::Shutdown();
     voice::Shutdown();
     be::Shutdown();
     return 0;

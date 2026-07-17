@@ -18,6 +18,8 @@ set(BLOODENGINE_SOURCES
     engine/sounds.cpp
     engine/localization.cpp
     engine/settings.cpp
+    engine/bindings.cpp
+    engine/rumble.cpp
 )
 
 # --- BLOODRUSH: the game built on BloodEngine ---
@@ -32,6 +34,7 @@ set(BLOODRUSH_SOURCES
     src/machine.cpp
     src/voice.cpp
     src/story.cpp
+    src/savegame.cpp
 )
 
 # --- raylib: system package when available, otherwise fetch and build ---
