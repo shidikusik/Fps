@@ -127,6 +127,10 @@ app menu without any Flatpak.
   (arm64-v8a, NativeActivity, min SDK 24).
 - **Flatpak:** see [packaging/flatpak/](packaging/flatpak/) — includes the
   Flathub submission guide.
+- **Steam:** everything is prepared — depot scripts, store assets and a
+  step-by-step release guide in [steam/](steam/) (Russian). CI builds a
+  Steam Linux Runtime (sniper) binary as the `bloodrush-steam-linux`
+  artifact.
 
 ### Troubleshooting
 

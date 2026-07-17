@@ -1,0 +1,40 @@
+// BLOODRUSH — Steam depot upload script.
+// Replace every YOUR_APP_ID below with the AppID from Steamworks
+// (depot IDs are AppID+1 and AppID+2 by default).
+// Layout before running:
+//   steam/content/windows/bloodrush.exe
+//   steam/content/linux/bloodrush
+// Then:
+//   steamcmd +login <account> +run_app_build ../steam/app_build.vdf +quit
+"AppBuild"
+{
+	"AppID" "YOUR_APP_ID"
+	"Desc" "BLOODRUSH v1.0.0"
+	"SetLive" ""            // leave empty; set the build live in Steamworks UI
+	"ContentRoot" "./content/"
+	"BuildOutput" "./output/"
+
+	"Depots"
+	{
+		// Windows depot (AppID+1)
+		"YOUR_APP_ID_PLUS_1"
+		{
+			"FileMapping"
+			{
+				"LocalPath" "./windows/*"
+				"DepotPath" "."
+				"recursive" "1"
+			}
+		}
+		// Linux depot (AppID+2)
+		"YOUR_APP_ID_PLUS_2"
+		{
+			"FileMapping"
+			{
+				"LocalPath" "./linux/*"
+				"DepotPath" "."
+				"recursive" "1"
+			}
+		}
+	}
+}

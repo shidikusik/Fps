@@ -141,6 +141,9 @@ sudo make install
 - **Android:** при установленных Android SDK + NDK команда
   `bash android/build_apk.sh` собирает и подписывает
   `build-android/bloodrush.apk` (arm64-v8a, NativeActivity, min SDK 24).
+- **Steam:** всё подготовлено — скрипты депотов, графика магазина и
+  пошаговый гайд по выпуску в [steam/](steam/). CI собирает Linux-бинарь
+  под Steam Linux Runtime (sniper) — артефакт `bloodrush-steam-linux`.
 
 На Android всё управление — тач-интерфейс; на десктопе его можно
 посмотреть так: `BLOODRUSH_TOUCH=1 ./bloodrush`.

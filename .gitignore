@@ -1,3 +1,8 @@
 build/
 .cache/
 compile_commands.json
+steam/content/windows/*
+steam/content/linux/*
+!steam/content/windows/.gitkeep
+!steam/content/linux/.gitkeep
+steam/output/

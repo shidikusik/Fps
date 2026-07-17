@@ -37,3 +37,21 @@ jobs:
         with:
           name: bloodrush-android
           path: build-android/bloodrush.apk
+
+  # Linux binary built inside the Steam Linux Runtime 3.0 (sniper) SDK,
+  # so it runs in Steam's container on every distro. This is the depot
+  # payload for the Linux side of the Steam release.
+  steam-linux:
+    runs-on: ubuntu-latest
+    container:
+      image: registry.gitlab.steamos.cloud/steamrt/sniper/sdk:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build in sniper runtime
+        run: |
+          cmake -S . -B build-steam -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-steam -j$(nproc)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bloodrush-steam-linux
+          path: build-steam/bloodrush
