@@ -19,6 +19,15 @@ Runs on **Linux** (X11 & Wayland), **Windows** and **Android**.
 |---|---|
 | THE YARD, wave one | intro cutscene |
 
+## BloodEngine
+
+BLOODRUSH runs on **BLOODENGINE** — our own tiny C++20 engine living in
+[engine/](engine/), built as a separate static library on top of raylib.
+The game code in `src/` only contains gameplay. Engine features: boot
+splash, letterboxed render pipeline with the lighting/fog shader, pixel
+font UI (Latin + Cyrillic), typewriter cutscenes, particles, procedural
+audio synth, persistent settings and the two-language string system.
+
 ## Story
 
 Earth is silent. **THE MACHINE** reactivates with empty fuel
@@ -212,11 +221,11 @@ Speed is always visible bottom-left (UPS = units per second).
 | `src/enemies.*` | 4 enemy types, waves, levels, boss, NG+ |
 | `src/arena.*` | 3 arenas built from AABB blocks, spawn pads |
 | `src/style_meter.*` | D→ULTRAVIOLENT ranks, popups, score |
-| `src/particles.*` | physical blood cubes and sparks |
-| `src/cutscene.*` | letterboxed typewriter cutscenes |
+| `engine/particles.*` | physical blood cubes and sparks |
+| `engine/cutscene.*` | letterboxed typewriter cutscenes |
 | `src/touch.*` | Android touch controls (stick, look, buttons) |
-| `src/sounds.*` | all sounds procedurally generated at startup |
-| `src/shading.h` | directional light + depth fog (GLSL 330 / ES 100) |
+| `engine/sounds.*` | all sounds procedurally generated at startup |
+| `engine/shading.h` | directional light + depth fog (GLSL 330 / ES 100) |
 | `src/config.h` | every movement/render constant in one place |
 
 Balance tuning: damage and cooldowns at the top of `weapons.cpp`, enemy
