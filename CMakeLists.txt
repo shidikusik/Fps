@@ -8,22 +8,30 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# --- BLOODENGINE: the reusable engine library ---
+set(BLOODENGINE_SOURCES
+    engine/bloodengine.cpp
+    engine/splash.cpp
+    engine/ui.cpp
+    engine/particles.cpp
+    engine/cutscene.cpp
+    engine/sounds.cpp
+    engine/localization.cpp
+    engine/settings.cpp
+)
+
+# --- BLOODRUSH: the game built on BloodEngine ---
 set(BLOODRUSH_SOURCES
     src/main.cpp
     src/player.cpp
     src/arena.cpp
     src/enemies.cpp
     src/weapons.cpp
-    src/particles.cpp
     src/style_meter.cpp
-    src/sounds.cpp
-    src/cutscene.cpp
     src/touch.cpp
-    src/ui.cpp
-    src/localization.cpp
-    src/settings.cpp
     src/machine.cpp
     src/voice.cpp
+    src/story.cpp
 )
 
 # --- raylib: system package when available, otherwise fetch and build ---
@@ -67,14 +75,19 @@ if(NOT raylib_FOUND)
     FetchContent_MakeAvailable(raylib)
 endif()
 
+add_library(bloodengine STATIC ${BLOODENGINE_SOURCES})
+target_include_directories(bloodengine PUBLIC engine)
+target_link_libraries(bloodengine PUBLIC raylib)
+set_target_properties(bloodengine PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 if(ANDROID)
     # NativeActivity loads libbloodrush.so; raylib provides the glue.
     add_library(bloodrush SHARED ${BLOODRUSH_SOURCES})
     target_link_options(bloodrush PRIVATE "-Wl,-u,ANativeActivity_onCreate")
-    target_link_libraries(bloodrush PRIVATE raylib log android EGL GLESv2 OpenSLES m)
+    target_link_libraries(bloodrush PRIVATE bloodengine log android EGL GLESv2 OpenSLES m)
 else()
     add_executable(bloodrush ${BLOODRUSH_SOURCES})
-    target_link_libraries(bloodrush PRIVATE raylib)
+    target_link_libraries(bloodrush PRIVATE bloodengine)
 
     if(UNIX AND NOT APPLE)
         target_link_libraries(bloodrush PRIVATE m)

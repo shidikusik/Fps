@@ -1,25 +1,12 @@
+#include "story.h"
 #include "localization.h"
-#include "settings.h"
 
 #include <cstdio>
 
-namespace loc {
-
-Lang Get() { return settings::Get().lang == 1 ? Lang::RU : Lang::EN; }
-
-void Toggle() {
-    settings::Get().lang = settings::Get().lang == 1 ? 0 : 1;
-    settings::Save();
-}
-
-void LoadPref() { /* storage moved to settings::Load() */ }
-
-const char* T(const char* en, const char* ru) {
-    return Get() == Lang::RU ? ru : en;
-}
+namespace story {
 
 const char* LevelName(int level) {
-    if (Get() == Lang::RU) {
+    if (loc::Get() == Lang::RU) {
         switch (level) {
             case 2: return "КАТАКОМБЫ";
             case 3: return "АЛТАРЬ";
@@ -38,7 +25,7 @@ const char* LevelName(int level) {
 }
 
 std::vector<std::string> IntroLines() {
-    if (Get() == Lang::RU) return {
+    if (loc::Get() == Lang::RU) return {
         "ЗЕМЛЯ МОЛЧИТ.",
         "НИ ПТИЦ. НИ МОТОРОВ. НИ МОЛИТВ.",
         "ГЛУБОКО ВНИЗУ ЧТО-ТО ОТКРЫВАЕТ ГЛАЗА.",
@@ -61,7 +48,7 @@ std::vector<std::string> IntroLines() {
 }
 
 std::vector<std::string> LevelLines(int level) {
-    if (Get() == Lang::RU) {
+    if (loc::Get() == Lang::RU) {
         switch (level) {
             case 2: return {
                 "ПЕРВЫЙ СЛОЙ ЗАЧИЩЕН.",
@@ -135,7 +122,7 @@ std::vector<std::string> LevelLines(int level) {
 
 std::vector<std::string> VictoryLines(int nextLoop) {
     char buf[96];
-    if (Get() == Lang::RU) {
+    if (loc::Get() == Lang::RU) {
         snprintf(buf, sizeof(buf), "КРУГ %d. КРОМЕ НАСИЛИЯ НЕТ НИЧЕГО.", nextLoop + 1);
         return {
             "ХРАНИТЕЛЬ ПАЛ.",
@@ -159,4 +146,4 @@ std::vector<std::string> VictoryLines(int nextLoop) {
     };
 }
 
-} // namespace loc
+} // namespace story

@@ -1,9 +1,8 @@
 #include "cutscene.h"
-#include "config.h"
+#include "engine_config.h"
 #include "localization.h"
 #include "sounds.h"
 #include "ui.h"
-#include "voice.h"
 #include "raylib.h"
 
 #include <cmath>
@@ -13,14 +12,14 @@ constexpr float CHARS_PER_SEC = 26.0f;
 constexpr float LINE_HOLD = 1.7f;
 }
 
-void Cutscene::Start(std::vector<std::string> lines, bool voiced) {
+void Cutscene::Start(std::vector<std::string> lines, LineCallback onLine) {
     lines_ = std::move(lines);
     line_ = 0;
     chars_ = 0;
     holdT_ = 0;
     totalT_ = 0;
     finished_ = lines_.empty();
-    voiced_ = voiced;
+    onLine_ = onLine;
     voicedLine_ = (size_t)-1;
     expectedT_ = 0.01f;
     for (const auto& l : lines_)
@@ -29,7 +28,6 @@ void Cutscene::Start(std::vector<std::string> lines, bool voiced) {
 
 void Cutscene::Skip() {
     finished_ = true;
-    voice::StopAll();
 }
 
 float Cutscene::Progress() const {
@@ -40,8 +38,8 @@ float Cutscene::Progress() const {
 void Cutscene::Update(float dt) {
     if (finished_) return;
     totalT_ += dt;
-    if (voiced_ && line_ != voicedLine_) {
-        voice::PlayIntroLine((int)line_);
+    if (onLine_ && line_ != voicedLine_) {
+        onLine_((int)line_);
         voicedLine_ = line_;
     }
     const std::string& cur = lines_[line_];
@@ -49,7 +47,7 @@ void Cutscene::Update(float dt) {
         float prev = chars_;
         chars_ += dt * CHARS_PER_SEC;
         // typewriter blips (quieter when the line is voiced)
-        if (!voiced_ && (int)(chars_ / 3) != (int)(prev / 3))
+        if (!onLine_ && (int)(chars_ / 3) != (int)(prev / 3))
             sfx::Play(sfx::CLICK, 0.18f, 1.6f + 0.15f * (line_ % 3));
     } else {
         holdT_ += dt;

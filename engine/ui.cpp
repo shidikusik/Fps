@@ -1,5 +1,5 @@
 #include "ui.h"
-#include "config.h"
+#include "engine_config.h"
 #include "font_data.h"
 
 #include <vector>

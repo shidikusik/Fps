@@ -7,8 +7,9 @@
 // Skippable with click / ENTER (handled by the caller via Skip()).
 class Cutscene {
 public:
-    // voiced = true plays THE MACHINE's voice-over per line (intro only).
-    void Start(std::vector<std::string> lines, bool voiced = false);
+    using LineCallback = void (*)(int line);
+    // onLine (optional) fires as each line starts — e.g. a voice-over.
+    void Start(std::vector<std::string> lines, LineCallback onLine = nullptr);
     void Update(float dt);
     void Skip();
     bool Finished() const { return finished_; }
@@ -23,5 +24,5 @@ private:
     float holdT_ = 0;         // pause after a line completes
     float totalT_ = 0, expectedT_ = 1;
     bool finished_ = true;
-    bool voiced_ = false;
+    LineCallback onLine_ = nullptr;
 };

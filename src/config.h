@@ -1,12 +1,13 @@
 #pragma once
 
+#include "engine_config.h"
+
 // Global tuning constants. Movement values are the heart of the game —
 // tune them here, everything reads from this file.
 namespace cfg {
 
-// --- render ---
-inline constexpr int   RENDER_W = 1280;  // internal render target (720p, crisp
-inline constexpr int   RENDER_H = 720;   // point-filtered upscale keeps the style)
+// render constants live in the engine
+// (RENDER_W / RENDER_H / MAX_DT come from engine_config.h)
 inline constexpr float BASE_FOV = 95.0f;
 inline constexpr float MAX_FOV_KICK = 12.0f;   // extra FOV at high speed
 
@@ -50,6 +51,5 @@ inline constexpr float SLAM_JUMP_MULT   = 1.45f; // ...for a boosted "storage" j
 // --- misc ---
 inline constexpr float KILL_PLANE   = -40.0f;    // fell off: respawn
 inline constexpr float MOUSE_SENS   = 0.09f;     // degrees per pixel
-inline constexpr float MAX_DT       = 1.0f / 30.0f;
 
 } // namespace cfg

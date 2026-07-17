@@ -6,6 +6,7 @@
 #include "rlgl.h"
 
 #include "arena.h"
+#include "bloodengine.h"
 #include "config.h"
 #include "cutscene.h"
 #include "enemies.h"
@@ -15,6 +16,8 @@
 #include "player.h"
 #include "settings.h"
 #include "shading.h"
+#include "splash.h"
+#include "story.h"
 #include "sounds.h"
 #include "style_meter.h"
 #include "touch.h"
@@ -35,7 +38,7 @@ constexpr Color HUD_YELLOW = { 255, 230, 0, 255 };
 constexpr Color HUD_WHITE  = { 235, 230, 230, 255 };
 constexpr Color HUD_DIM    = { 120, 60, 64, 255 };
 
-enum class GameState { Menu, Settings, Cutscene, Playing, Paused, Dead };
+enum class GameState { Splash, Menu, Settings, Cutscene, Playing, Paused, Dead };
 enum class AfterCutscene { BeginRun, ResumePlay };
 
 Rectangle SettingsButtonRect() {
@@ -224,7 +227,7 @@ void DrawGameHud(const Player& player, const EnemyManager& enemies,
     if (enemies.waveActive) {
         snprintf(buf, sizeof(buf),
                  loc::T("%s — WAVE %d/%d — %d LEFT", "%s — ВОЛНА %d/%d — ОСТАЛОСЬ %d"),
-                 loc::LevelName(arena.Level()), enemies.waveInLevel,
+                 story::LevelName(arena.Level()), enemies.waveInLevel,
                  EnemyManager::WAVES_PER_LEVEL, enemies.AliveCount());
         DrawCenteredText(buf, 10, 16, HUD_WHITE);
     } else if (!enemies.levelCleared) {
@@ -312,12 +315,12 @@ void DrawDeathOverlay(const EnemyManager& enemies, const StyleMeter& style,
         snprintf(buf, sizeof(buf),
                  loc::T("%s — WAVE %d — LOOP %d — SCORE %ld",
                         "%s — ВОЛНА %d — КРУГ %d — СЧЁТ %ld"),
-                 loc::LevelName(arena.Level()), enemies.waveInLevel,
+                 story::LevelName(arena.Level()), enemies.waveInLevel,
                  enemies.loop + 1, style.score);
     else
         snprintf(buf, sizeof(buf),
                  loc::T("%s — WAVE %d — SCORE %ld", "%s — ВОЛНА %d — СЧЁТ %ld"),
-                 loc::LevelName(arena.Level()), enemies.waveInLevel, style.score);
+                 story::LevelName(arena.Level()), enemies.waveInLevel, style.score);
     DrawCenteredText(buf, H / 2 - 10, 18, HUD_WHITE);
     if (fmodf((float)GetTime() * 1.6f, 1.0f) > 0.35f)
         DrawCenteredText(loc::T("CLICK / ENTER — RETRY", "КЛИК / ENTER — ЗАНОВО"),
@@ -342,13 +345,8 @@ Camera3D CinematicCamera(float t01, int level) {
 } // namespace
 
 int main() {
-    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(1280, 720, "BLOODRUSH");
-    SetExitKey(KEY_NULL);
-    sfx::Init();
+    be::Init(1280, 720, "BLOODRUSH");
     voice::Init();
-    ui::Init();
-    settings::Load();
 
     RenderTexture2D target = LoadRenderTexture(cfg::RENDER_W, cfg::RENDER_H);
     SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
@@ -377,7 +375,9 @@ int main() {
         weapons.Reset();
     };
 
-    GameState state = GameState::Menu;
+    GameState state = GameState::Splash;
+    Splash splash;
+    splash.Start();
     float shakeTime = 0;
     float legAnim = 0;
     bool quit = false;
@@ -401,6 +401,14 @@ int main() {
         map.offY = (GetScreenHeight() - cfg::RENDER_H * map.scale) * 0.5f;
 
         switch (state) {
+            case GameState::Splash:
+                splash.Update(dt);
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER) ||
+                    IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE))
+                    splash.Skip();
+                if (splash.Finished()) state = GameState::Menu;
+                break;
+
             case GameState::Menu: {
                 bool uiClicked = false;
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -424,7 +432,7 @@ int main() {
                 if ((IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !uiClicked) ||
                     IsKeyPressed(KEY_ENTER)) {
                     resetRun();
-                    cutscene.Start(loc::IntroLines(), true); // voiced intro
+                    cutscene.Start(story::IntroLines(), voice::PlayIntroLine); // voiced
                     afterCutscene = AfterCutscene::BeginRun;
                     state = GameState::Cutscene;
                     sfx::Play(sfx::CLICK);
@@ -441,8 +449,10 @@ int main() {
             case GameState::Cutscene:
                 cutscene.Update(dt);
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER) ||
-                    IsKeyPressed(KEY_ESCAPE))
+                    IsKeyPressed(KEY_ESCAPE)) {
                     cutscene.Skip();
+                    voice::StopAll();
+                }
                 if (cutscene.Finished()) {
                     state = GameState::Playing;
                     DisableCursor();
@@ -498,7 +508,7 @@ int main() {
                         player.vel = { 0, 0, 0 };
                         player.Heal(50);
                         particles.Reset();
-                        cutscene.Start(loc::LevelLines(next));
+                        cutscene.Start(story::LevelLines(next));
                     } else {
                         // Warden down: victory, then loop deeper
                         int nextLoop = enemies.loop + 1;
@@ -509,7 +519,7 @@ int main() {
                         player.vel = { 0, 0, 0 };
                         player.hp = player.maxHp;
                         particles.Reset();
-                        cutscene.Start(loc::VictoryLines(enemies.loop));
+                        cutscene.Start(story::VictoryLines(enemies.loop));
                     }
                     afterCutscene = AfterCutscene::ResumePlay;
                     state = GameState::Cutscene;
@@ -562,6 +572,18 @@ int main() {
         // --- render into the target ---
         BeginTextureMode(target);
         ClearBackground({ 8, 4, 6, 255 });
+        if (state == GameState::Splash) {
+            splash.Draw();
+            EndTextureMode();
+            BeginDrawing();
+            ClearBackground(BLACK);
+            Rectangle ssrc = { 0, 0, (float)cfg::RENDER_W, -(float)cfg::RENDER_H };
+            Rectangle sdst = { map.offX, map.offY,
+                               cfg::RENDER_W * map.scale, cfg::RENDER_H * map.scale };
+            DrawTexturePro(target.texture, ssrc, sdst, { 0, 0 }, 0, WHITE);
+            EndDrawing();
+            continue;
+        }
         DrawSky();
         BeginMode3D(cam);
         BeginShaderMode(shading);
@@ -633,9 +655,7 @@ int main() {
 
     UnloadShader(shading);
     UnloadRenderTexture(target);
-    ui::Shutdown();
     voice::Shutdown();
-    sfx::Shutdown();
-    CloseWindow();
+    be::Shutdown();
     return 0;
 }
