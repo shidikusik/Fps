@@ -45,8 +45,8 @@ enum class GameState { Splash, Menu, Settings, Controls, Cutscene, Playing, Paus
 enum class AfterCutscene { BeginRun, ResumePlay };
 
 bool PadConfirmPressed() {
-    return binds::PadActive() &&
-           IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+    int p = binds::PadIndex();
+    return p >= 0 && IsGamepadButtonPressed(p, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
 }
 
 float Dead(float v) { return fabsf(v) < 0.18f ? 0.0f : v; }
@@ -121,9 +121,15 @@ void DrawSettingsScreen() {
     DrawButton(r.controls, loc::T("CONTROLS...", "УПРАВЛЕНИЕ..."), 18, yellow);
     DrawButton(r.back, loc::T("BACK", "НАЗАД"), 18, white);
 
-    if (binds::PadActive())
-        ui::TextCentered(loc::T("GAMEPAD CONNECTED", "ГЕЙМПАД ПОДКЛЮЧЁН"),
-                         H - 40, 14, { 255, 220, 120, 255 });
+    if (binds::PadActive()) {
+        char pad[96];
+        snprintf(pad, sizeof(pad), loc::T("GAMEPAD: %s", "ГЕЙМПАД: %s"),
+                 binds::PadName());
+        ui::TextCentered(pad, H - 40, 14, { 255, 220, 120, 255 });
+    } else {
+        ui::TextCentered(loc::T("NO GAMEPAD DETECTED", "ГЕЙМПАД НЕ НАЙДЕН"),
+                         H - 40, 14, { 120, 60, 64, 255 });
+    }
 }
 
 // 0 = stay, 1 = back to menu, 2 = open controls screen
@@ -211,8 +217,9 @@ bool UpdateControlsScreen(Vector2 mp) {
             for (int m = 0; m <= 2; m++)
                 if (IsMouseButtonPressed(m)) { b.mouse = m; b.key = -1; captureAction = -1; binds::Save(); sfx::Play(sfx::CLICK, 0.6f); return false; }
         } else if (binds::PadActive()) {
+            int p = binds::PadIndex();
             for (int g = 1; g <= 17; g++)
-                if (IsGamepadButtonPressed(0, g)) { b.pad = g; captureAction = -1; binds::Save(); sfx::Play(sfx::CLICK, 0.6f); return false; }
+                if (IsGamepadButtonPressed(p, g)) { b.pad = g; captureAction = -1; binds::Save(); sfx::Play(sfx::CLICK, 0.6f); return false; }
         }
         return false;
     }
@@ -249,14 +256,15 @@ PlayerInput GatherInput(float dt) {
     in.crouchPressed= binds::Pressed(binds::A_CROUCH);
     in.crouchHeld   = binds::Down(binds::A_CROUCH);
 
-    if (binds::PadActive()) {
+    int pad = binds::PadIndex();
+    if (pad >= 0) {
         // left stick: movement; right stick: look (deadzone + dt scaling)
-        in.side += Dead(GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X));
-        in.fwd  -= Dead(GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y));
+        in.side += Dead(GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_X));
+        in.fwd  -= Dead(GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_Y));
         in.side = Clamp(in.side, -1.0f, 1.0f);
         in.fwd = Clamp(in.fwd, -1.0f, 1.0f);
-        float rx = Dead(GetGamepadAxisMovement(0, GAMEPAD_AXIS_RIGHT_X));
-        float ry = Dead(GetGamepadAxisMovement(0, GAMEPAD_AXIS_RIGHT_Y));
+        float rx = Dead(GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_X));
+        float ry = Dead(GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_Y));
         in.mouseDx += rx * fabsf(rx) * 2600.0f * dt;  // squared response curve
         in.mouseDy += ry * fabsf(ry) * 1800.0f * dt;
     }

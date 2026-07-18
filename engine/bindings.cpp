@@ -59,13 +59,33 @@ void Load() {
     fclose(f);
 }
 
-bool PadActive() { return IsGamepadAvailable(0); }
+namespace {
+int cachedPad = -1;
+}
+
+int PadIndex() {
+    // keep using the same pad while it stays connected
+    if (cachedPad >= 0 && IsGamepadAvailable(cachedPad)) return cachedPad;
+    for (int i = 0; i < 4; i++) {
+        if (IsGamepadAvailable(i)) { cachedPad = i; return i; }
+    }
+    cachedPad = -1;
+    return -1;
+}
+
+bool PadActive() { return PadIndex() >= 0; }
+
+const char* PadName() {
+    int i = PadIndex();
+    return i >= 0 ? GetGamepadName(i) : "";
+}
 
 bool Down(Action a) {
     const Binding& b = table[a];
     if (b.key >= 0 && IsKeyDown(b.key)) return true;
     if (b.mouse >= 0 && IsMouseButtonDown(b.mouse)) return true;
-    if (b.pad >= 0 && PadActive() && IsGamepadButtonDown(0, b.pad)) return true;
+    int p = PadIndex();
+    if (b.pad >= 0 && p >= 0 && IsGamepadButtonDown(p, b.pad)) return true;
     return false;
 }
 
@@ -73,7 +93,8 @@ bool Pressed(Action a) {
     const Binding& b = table[a];
     if (b.key >= 0 && IsKeyPressed(b.key)) return true;
     if (b.mouse >= 0 && IsMouseButtonPressed(b.mouse)) return true;
-    if (b.pad >= 0 && PadActive() && IsGamepadButtonPressed(0, b.pad)) return true;
+    int p = PadIndex();
+    if (b.pad >= 0 && p >= 0 && IsGamepadButtonPressed(p, b.pad)) return true;
     return false;
 }
 

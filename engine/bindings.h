@@ -31,7 +31,10 @@ const char* ActionName(Action a, bool ru);
 const char* KeyLabel(const Binding& b);   // "W" / "LMB" / "—"
 const char* PadLabel(const Binding& b);   // "CROSS" / "R2" / "—"
 
-// true while a real gamepad is connected
+// Gamepad discovery. PadIndex() scans slots 0..3 and returns the first
+// connected pad (or -1). PadActive() is a convenience for "any pad".
+int PadIndex();
 bool PadActive();
+const char* PadName();   // "" when none
 
 } // namespace binds
