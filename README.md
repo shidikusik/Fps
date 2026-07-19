@@ -183,7 +183,9 @@ with `BLOODRUSH_TOUCH=1 ./bloodrush`.
 via USB/Bluetooth). DualShock 4 is first-class: left stick moves, right
 stick aims, CROSS jumps, L1 dashes, R1 slides/slams, R2 fires, L2 alt-fire,
 SQUARE cycles weapons, OPTIONS pauses. **Rumble** is supported — Linux via
-kernel force-feedback, Windows via XInput — and can be toggled in Settings.
+kernel force-feedback, Windows via XInput — and can be toggled in Settings. An embedded
+SDL controller mapping database is loaded at startup so pads map
+correctly even over Bluetooth (e.g. a Bluetooth DualShock 4).
 Every action (keyboard, mouse and gamepad) is **rebindable** in
 Settings → Controls, saved to `~/.config/bloodrush.binds`.
 
